@@ -2,7 +2,7 @@ export default class GamePlay extends Phaser.Scene {
   constructor() { super({ key: "GamePlay" }); }
 
   preload() {
-    this.load.image("bg_core", "assets/images/bg_core.png");
+    this.load.image("bg_core", "../assets/images/bg_core.png");
     this.load.font('Orbitron', 'https://fonts.gstatic.com/s/orbitron/v25/y9tQCBdK3zEe7pQ6mxP5S798.woff2');
   }
   

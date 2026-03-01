@@ -3,7 +3,6 @@ export default class GamePlay extends Phaser.Scene {
 
   preload() {
     this.load.image("bg_core", "../assets/images/bg_core.png");
-    this.load.font('Orbitron', 'https://fonts.gstatic.com/s/orbitron/v25/y9tQCBdK3zEe7pQ6mxP5S798.woff2');
   }
   
   create() {
@@ -72,6 +71,12 @@ export default class GamePlay extends Phaser.Scene {
 
         btn.on("pointerover", () => { btn.setScale(1.1); btn.setTint(0xffffff); });
         btn.on("pointerout", () => { btn.setScale(1.0); btn.clearTint(); });
+
+        btn.on("pointerdown", () => {
+        if(data.t === "OPTIONS") {
+        this.scene.start("Options");
+    }
+});
     });
 }
 

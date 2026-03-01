@@ -1,4 +1,4 @@
-export let GameData: gameData = {
+export let GameData = {
   globals: {
     gameWidth: 1280,
     gameHeight: 800,
@@ -14,6 +14,13 @@ export let GameData: gameData = {
     loadingTextY: 700,
   },
 
+  settings: {
+    graphics: 0.8,
+    audio: 0.6,
+    invertY: false,
+    vibration: true
+  },
+
   images: [
     { name: 'phaser-logo', path: '/images/phaser-logo.png' },
     { name: 'knight', path: '/images/knight.svg' }
@@ -25,6 +32,10 @@ export let GameData: gameData = {
   videos: [],
   scripts: [],
   fonts: [{ key: 'Boldonse', path: '/fonts/Boldonse.ttf' }],
-  webfonts: [{ key: 'Roboto' }, { key: 'Pixelify Sans' }, { key: 'Bungee Tint' }],
+  webfonts: [
+    { key: 'Roboto' },
+    { key: 'Pixelify Sans' },
+    { key: 'Bungee Tint' }
+  ],
   bitmapfonts: [],
 };

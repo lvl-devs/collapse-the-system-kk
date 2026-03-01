@@ -6,6 +6,7 @@ import Preloader from "./game/scenes/Preloader";
 import Boot from "./game/scenes/Boot";
 import Menu from "./game/scenes/Menu";
 import GamePlay from "./game/scenes/GamePlay";
+import Options from "./game/scenes/Options";
 
 window.addEventListener("load", () => {
   const config: Phaser.Types.Core.GameConfig = {
@@ -23,7 +24,8 @@ window.addEventListener("load", () => {
       Preloader,
       Boot,
       Menu,
-      GamePlay
+      GamePlay,
+      Options
     ],
     physics: {
       default: "arcade",

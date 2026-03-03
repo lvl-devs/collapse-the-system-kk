@@ -47,7 +47,7 @@ export default class Options extends Phaser.Scene {
 
         backBtn.on('pointerover', () => backBtn.setStyle({ color: '#ffffff' }).setScale(1.1));
         backBtn.on('pointerout', () => backBtn.setStyle({ color: '#00ffff' }).setScale(1));
-        backBtn.on('pointerdown', () => this.scene.start('GamePlay'));
+        backBtn.on('pointerdown', () => this.scene.start('Menu'));
     }
 
     /**

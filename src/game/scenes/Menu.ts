@@ -29,6 +29,12 @@ export default class Menu extends Phaser.Scene {
     const bgVideo = this.add.video(width / 2, height / 2, "bg-menu");
     bgVideo.setOrigin(0.5);
     bgVideo.play(true); // loop
+    bgVideo.on('created', () => {
+      const scaleX = width / bgVideo.width;
+      const scaleY = height / bgVideo.height;
+      const scale = Math.max(scaleX, scaleY);
+      bgVideo.setScale(scale);
+    });
     
     this.add
       .text(width * 0.05, height * 0.05, GameData.globals.gameTitle, {

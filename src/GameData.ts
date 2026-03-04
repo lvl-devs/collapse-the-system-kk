@@ -32,6 +32,10 @@ export interface GameDataType {
   preloader: PreloaderConfig;
   settings: Settings;
 
+  // optional per-channel volumes (0..1)
+  sfxVolume?: number;
+  musicVolume?: number;
+
   images: { name: string; path: string }[];
   tilemaps: any[];
   atlas: any[];
@@ -75,6 +79,10 @@ export const GameData: GameDataType = {
     vibration: true
   },
 
+  // volume defaults (used by Options scene sliders)
+  sfxVolume: 0.7,
+  musicVolume: 0.6,
+
   images: [
     { name: 'phaser-logo', path: '/images/phaser-logo.png' },
     { name: 'knight', path: '/images/knight.svg' }
@@ -99,3 +107,5 @@ export const GameData: GameDataType = {
 
   bitmapfonts: [],
 };
+
+export default GameData;

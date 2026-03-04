@@ -1,153 +1,227 @@
-import Phaser from 'phaser';
-import { GameData } from '../../GameData';
+import Phaser from "phaser";
+import { GameData } from "../../GameData"; // adattalo se il path è diverso
+
+type SliderConfig = {
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+  initial: number; // 0..1
+  onChange: (v: number) => void;
+};
 
 export default class Options extends Phaser.Scene {
+  constructor() {
+    super("Options");
+  }
 
-    constructor() {
-        super('Options');
+  create() {
+    const { width, height } = this.scale;
+
+    // Background (leggermente “spento” come nello screenshot)
+    const bg = this.add.image(width / 2, height / 2, "bg_logo");
+    this.scaleToCover(bg, width, height);
+    bg.setAlpha(0.75);
+
+    this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.25);
+
+    // Panel geometry (centrato)
+    const panelW = Math.round(width * 0.28);
+    const panelH = Math.round(height * 0.62);
+    const panelX = Math.round(width * 0.50);
+    const panelY = Math.round(height * 0.50);
+
+    const neon = 0x4fffbf;
+
+    // Panel outline
+    const panel = this.add.graphics();
+    panel.lineStyle(3, neon, 0.85);
+    this.roundRectStroke(panel, panelX - panelW / 2, panelY - panelH / 2, panelW, panelH, 14);
+
+    // Header box
+    const headerH = Math.round(height * 0.085);
+    const headerW = Math.round(panelW * 0.88);
+    const headerY = panelY - panelH / 2 - Math.round(height * 0.01);
+
+    const header = this.add.graphics();
+    header.lineStyle(3, neon, 0.85);
+    this.roundRectStroke(
+      header,
+      panelX - headerW / 2,
+      headerY,
+      headerW,
+      headerH,
+      10
+    );
+
+    const headerTxt = this.add
+      .text(panelX, headerY + headerH / 2, "SETTINGS", {
+        fontFamily: "monospace",
+        fontSize: `${Math.round(height * 0.055)}px`,
+        color: "#4fffbf",
+      })
+      .setOrigin(0.5);
+    headerTxt.setShadow(2, 2, "#0b5b47", 0, true, true);
+
+    // Inner “slots” (Sound Effects + Music) con box stile screenshot
+    const slotW = Math.round(panelW * 0.78);
+    const slotH = Math.round(height * 0.085);
+    const slotX = panelX;
+    const slot1Y = panelY - Math.round(panelH * 0.13);
+    const slot2Y = panelY;
+
+    this.drawSlot(slotX, slot1Y, slotW, slotH, "Sound Effects", neon, height);
+    this.drawSlot(slotX, slot2Y, slotW, slotH, "Music", neon, height);
+
+    // Slider bars
+    const sliderW = Math.round(slotW * 0.78);
+    const sliderX = panelX - sliderW / 2;
+    const slider1Y = slot1Y + Math.round(slotH * 0.58);
+    const slider2Y = slot2Y + Math.round(slotH * 0.58);
+
+    this.createSlider({
+      label: "sfx",
+      x: sliderX,
+      y: slider1Y,
+      width: sliderW,
+      initial: GameData.sfxVolume ?? 0.7,
+      onChange: (v) => {
+        GameData.sfxVolume = v;
+        // Se gestite la sound manager globale:
+        // this.sound.volume = ... (di solito per music è separato)
+      },
+    });
+
+    this.createSlider({
+      label: "music",
+      x: sliderX,
+      y: slider2Y,
+      width: sliderW,
+      initial: GameData.musicVolume ?? 0.6,
+      onChange: (v) => {
+        GameData.musicVolume = v;
+        // Se avete un'istanza di musica:
+        // GameData.music?.setVolume(v);
+      },
+    });
+
+    // Back button (cerchio)
+    const backR = Math.round(height * 0.05);
+    const backCX = panelX;
+    const backCY = panelY + Math.round(panelH * 0.32);
+
+    const backG = this.add.graphics();
+    backG.lineStyle(3, neon, 0.85);
+    backG.strokeCircle(backCX, backCY, backR);
+
+    const backTxt = this.add
+      .text(backCX, backCY, "Back", {
+        fontFamily: "monospace",
+        fontSize: `${Math.round(height * 0.03)}px`,
+        color: "#4fffbf",
+      })
+      .setOrigin(0.5);
+    backTxt.setShadow(2, 2, "#0b5b47", 0, true, true);
+
+    const backHit = this.add.circle(backCX, backCY, backR + 6, 0x000000, 0.001);
+    backHit.setInteractive({ useHandCursor: true })
+      .on("pointerover", () => {
+        backTxt.setColor("#a9ffe2");
+        backG.setAlpha(1);
+      })
+      .on("pointerout", () => {
+        backTxt.setColor("#4fffbf");
+        backG.setAlpha(0.85);
+      })
+      .on("pointerdown", () => {
+        this.sound.play?.("ui_click", { volume: 0.6 });
+        this.scene.start("Menu");
+      });
+
+    // Responsivo
+    this.scale.on("resize", () => this.scene.restart());
+  }
+
+  private drawSlot(cx: number, cy: number, w: number, h: number, label: string, neon: number, screenH: number) {
+    const g = this.add.graphics();
+    g.lineStyle(3, neon, 0.85);
+    this.roundRectStroke(g, cx - w / 2, cy - h / 2, w, h, 10);
+
+    const t = this.add.text(cx, cy, label, {
+      fontFamily: "monospace",
+      fontSize: `${Math.round(screenH * 0.035)}px`,
+      color: "#e8fff7",
+    }).setOrigin(0.5);
+
+    t.setShadow(2, 2, "#0b5b47", 0, true, true);
+  }
+
+  private createSlider(cfg: SliderConfig) {
+    const neon = 0x4fffbf;
+
+    // dotted baseline
+    const base = this.add.graphics();
+    base.lineStyle(2, neon, 0.45);
+    base.beginPath();
+    base.moveTo(cfg.x, cfg.y);
+    base.lineTo(cfg.x + cfg.width, cfg.y);
+    base.strokePath();
+
+    // small dots
+    const dots = this.add.graphics();
+    dots.fillStyle(neon, 0.35);
+    const step = 12;
+    for (let x = cfg.x; x <= cfg.x + cfg.width; x += step) {
+      dots.fillRect(x, cfg.y - 1, 4, 2);
     }
 
-    preload() {
-        this.load.image('bg_logo', '../assets/images/bg_logo.png');
-    }
+    // knob (quadratino)
+    const knobSize = 14;
+    const knob = this.add.rectangle(0, 0, knobSize, knobSize, 0x000000, 0.0);
+    knob.setStrokeStyle(3, neon, 0.9);
 
-    create() {
+    const startX = cfg.x + Phaser.Math.Clamp(cfg.initial, 0, 1) * cfg.width;
+    knob.setPosition(startX, cfg.y);
 
-        const { width, height } = this.scale;
+    knob.setInteractive({ draggable: true, useHandCursor: true });
 
-        // ===== SFONDO CENTRATO =====
-        const bg = this.add.image(width / 2, height / 2, 'bg_logo');
-        const scale = Math.max(width / bg.width, height / bg.height);
-        bg.setScale(scale);
+    this.input.setDraggable(knob);
 
-        const centerX = width / 2;
-        const centerY = height / 2;
+    const updateFromX = (px: number) => {
+      const clamped = Phaser.Math.Clamp(px, cfg.x, cfg.x + cfg.width);
+      knob.x = clamped;
+      const v = (clamped - cfg.x) / cfg.width;
+      cfg.onChange(Phaser.Math.Clamp(v, 0, 1));
+    };
 
-        // ===== CONTENITORE SETTINGS (CORNICE NEON) =====
-        const panelWidth = 420;
-        const panelHeight = 500;
+    knob.on("drag", (_p: any, dragX: number) => updateFromX(dragX));
 
-        const panel = this.add.rectangle(
-            centerX,
-            centerY,
-            panelWidth,
-            panelHeight,
-            0x000000,
-            0.35
-        );
+    // anche click sulla linea
+    const hit = this.add.rectangle(cfg.x + cfg.width / 2, cfg.y, cfg.width, 28, 0x000000, 0.001);
+    hit.setInteractive({ useHandCursor: true }).on("pointerdown", (p: Phaser.Input.Pointer) => {
+      updateFromX(p.worldX);
+    });
 
-        panel.setStrokeStyle(2, 0x00ffcc);
+    // init
+    cfg.onChange(Phaser.Math.Clamp(cfg.initial, 0, 1));
+  }
 
-        // ===== HEADER SETTINGS =====
-        const header = this.add.text(centerX, centerY - 230, 'SETTINGS', {
-            fontFamily: 'Pixelify Sans',
-            fontSize: '42px',
-            color: '#00ffcc',
-            fontStyle: 'bold'
-        }).setOrigin(0.5);
+  private roundRectStroke(g: Phaser.GameObjects.Graphics, x: number, y: number, w: number, h: number, r: number) {
+    g.strokeRoundedRect(x, y, w, h, r);
+    // piccole “tacche” decorative (simile frame HUD)
+    g.lineStyle(2, 0x4fffbf, 0.5);
+    g.beginPath();
+    g.moveTo(x + 10, y);
+    g.lineTo(x + 26, y);
+    g.moveTo(x + w - 26, y + h);
+    g.lineTo(x + w - 10, y + h);
+    g.strokePath();
+  }
 
-        header.setShadow(0, 0, '#00ffcc', 15, true, true);
-
-        // ===== SLIDER SOUND EFFECTS =====
-        this.createCyberSlider(centerX, centerY - 80, 'Sound Effects', 'graphics');
-
-        // ===== SLIDER MUSIC =====
-        this.createCyberSlider(centerX, centerY + 10, 'Music', 'audio');
-
-        // ===== BACK BUTTON CIRCOLARE =====
-        const backCircle = this.add.circle(centerX, centerY + 150, 45)
-            .setStrokeStyle(2, 0x00ffcc)
-            .setFillStyle(0x000000, 0.4)
-            .setInteractive({ useHandCursor: true });
-
-        const backText = this.add.text(centerX, centerY + 150, 'Back', {
-            fontFamily: 'Pixelify Sans',
-            fontSize: '22px',
-            color: '#00ffcc'
-        }).setOrigin(0.5);
-
-        backCircle.on('pointerover', () => {
-            backCircle.setScale(1.1);
-            backText.setColor('#ffffff');
-        });
-
-        backCircle.on('pointerout', () => {
-            backCircle.setScale(1);
-            backText.setColor('#00ffcc');
-        });
-
-        backCircle.on('pointerdown', () => {
-            this.scene.start('Menu');
-        });
-    }
-
-    // =============================
-    // CYBER SLIDER
-    // =============================
-    private createCyberSlider(
-        x: number,
-        y: number,
-        label: string,
-        settingKey: 'graphics' | 'audio'
-    ) {
-
-        const sliderWidth = 220;
-
-        // LABEL
-        const labelText = this.add.text(x, y - 30, label, {
-            fontFamily: 'Pixelify Sans',
-            fontSize: '24px',
-            color: '#ffffff'
-        }).setOrigin(0.5);
-
-        // TRACK (linea tratteggiata tech)
-        const track = this.add.rectangle(x - sliderWidth / 2, y, sliderWidth, 4, 0x00ffcc)
-            .setOrigin(0, 0.5)
-            .setAlpha(0.6);
-
-        const initialValue = GameData.settings[settingKey];
-
-        // FILL
-        const fill = this.add.rectangle(
-            x - sliderWidth / 2,
-            y,
-            sliderWidth * initialValue,
-            4,
-            0x00ffcc
-        ).setOrigin(0, 0.5);
-
-        // HANDLE (quadrato tech)
-        const handle = this.add.rectangle(
-            x - sliderWidth / 2 + sliderWidth * initialValue,
-            y,
-            14,
-            14,
-            0x000000
-        )
-        .setStrokeStyle(2, 0x00ffcc)
-        .setInteractive({ draggable: true, useHandCursor: true });
-
-        this.input.setDraggable(handle);
-
-        handle.on('drag', (_pointer: Phaser.Input.Pointer, dragX: number) => {
-
-            const minX = track.x;
-            const maxX = track.x + sliderWidth;
-
-            const clampedX = Phaser.Math.Clamp(dragX, minX, maxX);
-            handle.x = clampedX;
-
-            const newValue = (clampedX - minX) / sliderWidth;
-
-            fill.width = clampedX - minX;
-            GameData.settings[settingKey] = newValue;
-
-            if (settingKey === 'audio') {
-                this.sound.volume = newValue;
-            }
-        });
-
-        handle.on('pointerover', () => handle.setScale(1.2));
-        handle.on('pointerout', () => handle.setScale(1));
-    }
+  private scaleToCover(img: Phaser.GameObjects.Image, w: number, h: number) {
+    const iw = img.width;
+    const ih = img.height;
+    const scale = Math.max(w / iw, h / ih);
+    img.setScale(scale);
+  }
 }

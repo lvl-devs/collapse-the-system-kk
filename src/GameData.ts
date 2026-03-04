@@ -12,6 +12,7 @@ export interface Settings {
 export interface Globals {
   gameWidth: number;
   gameHeight: number;
+  gameTitle: string;
   bgColor: string;
   debug: boolean;
   defaultFont: {
@@ -57,7 +58,8 @@ export const GameData: GameDataType = {
   globals: {
     gameWidth: 1280,
     gameHeight: 800,
-    bgColor: "#0a0a0f", // più cyberpunk
+    gameTitle: "Collapse The System",
+    bgColor: "#0a0a0f",
     debug: false,
     defaultFont: {
       key: "Pixelify Sans",
@@ -79,13 +81,11 @@ export const GameData: GameDataType = {
     vibration: true
   },
 
-  // volume defaults (used by Options scene sliders)
   sfxVolume: 0.7,
   musicVolume: 0.6,
 
   images: [
     { name: 'phaser-logo', path: '/images/phaser-logo.png' },
-    { name: 'knight', path: '/images/knight.svg' }
   ],
 
   tilemaps: [],

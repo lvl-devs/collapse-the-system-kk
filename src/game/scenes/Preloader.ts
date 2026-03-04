@@ -68,8 +68,8 @@ export default class Preloader extends Phaser.Scene {
 
     // VIDEO
     if(GameData.videos != null) GameData.videos.forEach((element: VideoAsset) => {
-        this.load.video(element.name, element.path, true);
-      });
+      this.load.video(element.name, element.path, true);
+    });
 
     // SOUNDS
     if(GameData.sounds != null) GameData.sounds.forEach((element: SoundAsset) => {

@@ -6,10 +6,14 @@ import Preloader from "./game/scenes/Preloader";
 import Boot from "./game/scenes/Boot";
 import Menu from "./game/scenes/Menu";
 import GamePlay from "./game/scenes/GamePlay";
+import Options from "./game/scenes/Options";
+
 
 window.addEventListener("load", () => {
   const config: Phaser.Types.Core.GameConfig = {
-    type: Phaser.WEBGL,
+    type: Phaser.AUTO,
+    pixelArt: true,
+    roundPixels: true,
     backgroundColor: GameData.globals.bgColor,
     parent: "app",
     scale: {
@@ -23,7 +27,8 @@ window.addEventListener("load", () => {
       Preloader,
       Boot,
       Menu,
-      GamePlay
+      GamePlay,
+      Options
     ],
     physics: {
       default: "arcade",
@@ -34,8 +39,8 @@ window.addEventListener("load", () => {
       keyboard: true,
     },
     render: {
-      pixelArt: false,
-      antialias: true,
+      pixelArt: true,
+      antialias: false,
     },
     loader: {
       baseURL: '/assets/',

@@ -85,14 +85,15 @@ export const GameData: GameDataType = {
 
   images: [
     { name: 'phaser-logo', path: '/images/phaser-logo.png' },
-    { name: 'knight', path: '/images/knight.svg' }
   ],
 
   tilemaps: [],
   atlas: [],
   spritesheets: [],
   sounds: [],
-  videos: [],
+  videos: [
+    { name: 'bg-menu', path: '/videos/bg-menu.mp4' }
+  ],
   scripts: [],
 
   fonts: [

@@ -47,5 +47,5 @@ window.addEventListener("load", () => {
     },
   };
 
-  const game = new Phaser.Game(config); // game initializing according to configs
+  new Phaser.Game(config); // game initializing according to configs
 });

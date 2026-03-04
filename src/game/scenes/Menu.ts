@@ -1,22 +1,19 @@
 import Phaser from "phaser";
 import GameData from "../../GameData";
+import SfxManager from "../audio/SfxManager";
+import AssetPipeline from "../systems/AssetPipeline";
 
 export default class Menu extends Phaser.Scene {
   private static readonly MENU_MUSIC_KEY = "menu-theme";
-  private static readonly MENU_MUSIC_PATH = "music/menu.mp3";
   private menuMusic?: Phaser.Sound.BaseSound;
   private unlockHandler?: () => void;
 
   constructor(){ super({ key: "Menu" }); }
 
-  preload(){
-    if (!this.cache.audio.exists(Menu.MENU_MUSIC_KEY)) {
-      this.load.audio(Menu.MENU_MUSIC_KEY, Menu.MENU_MUSIC_PATH);
-    }
-  }
-
   create(){
     this.sound.pauseOnBlur = false;
+    SfxManager.init(this, GameData.sfxVolume ?? 0.7);
+    AssetPipeline.startDeferredPreload(this);
     this.startMenuMusic();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.clearUnlockListeners());
 

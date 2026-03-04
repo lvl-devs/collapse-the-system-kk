@@ -85,13 +85,16 @@ export const GameData: GameDataType = {
   musicVolume: 0.6,
 
   images: [
-    { name: 'phaser-logo', path: '/images/phaser-logo.png' },
+    { name: "bg_logo", path: "/images/bg_logo.png" },
+    { name: "title_img", path: "/images/title.png" },
   ],
 
   tilemaps: [],
   atlas: [],
   spritesheets: [],
-  sounds: [],
+  sounds: [
+    { name: "menu-theme", paths: ["/music/menu.mp3"] }
+  ],
   videos: [
     { name: 'bg-menu', path: '/videos/bg-menu.mp4' }
   ],

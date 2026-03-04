@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { GameData } from "../../GameData"; // adattalo se il path è diverso
+import SfxManager from "../audio/SfxManager";
 
 type SliderConfig = {
   label: string;
@@ -16,6 +17,8 @@ export default class Options extends Phaser.Scene {
   }
 
   create() {
+    SfxManager.init(this, GameData.sfxVolume ?? 0.7);
+
     const { width, height } = this.scale;
 
     // Background (leggermente “spento” come nello screenshot)
@@ -87,8 +90,7 @@ export default class Options extends Phaser.Scene {
       initial: GameData.sfxVolume ?? 0.7,
       onChange: (v) => {
         GameData.sfxVolume = v;
-        // Se gestite la sound manager globale:
-        // this.sound.volume = ... (di solito per music è separato)
+        SfxManager.setVolume(v);
       },
     });
 
@@ -134,7 +136,7 @@ export default class Options extends Phaser.Scene {
         backG.setAlpha(0.85);
       })
       .on("pointerdown", () => {
-        this.sound.play?.("ui_click", { volume: 0.6 });
+        SfxManager.play("ui_click", { volume: 0.6 });
         this.scene.start("Menu");
       });
 

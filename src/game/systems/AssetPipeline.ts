@@ -5,7 +5,7 @@ type Phase = "critical" | "deferred";
 
 const CRITICAL_IMAGE_KEYS = new Set(["bg_logo", "title_img"]);
 const CRITICAL_VIDEO_KEYS = new Set(["bg-menu"]);
-const CRITICAL_SOUND_KEYS = new Set(["menu-theme"]);
+const CRITICAL_SOUND_KEYS = new Set(["menu-theme", "rain-sfx"]);
 
 export default class AssetPipeline {
   private static deferredStarted = false;

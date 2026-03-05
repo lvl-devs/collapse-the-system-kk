@@ -112,7 +112,8 @@ export const GameData: GameDataType = {
   atlas: [],
   spritesheets: [],
   sounds: [
-    { name: "menu-theme", paths: ["/music/menu.mp3"] }
+    { name: "menu-theme", paths: ["/music/menu.mp3"] },
+    { name: "rain-sfx", paths: ["/sounds/rain.mp3"] }
   ],
   videos: [
     { name: 'bg-menu', path: '/videos/bg-menu.mp4' }

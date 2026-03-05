@@ -2,9 +2,11 @@ import Phaser from "phaser";
 import GameData from "../../GameData";
 import AssetPipeline from "../systems/AssetPipeline";
 import MusicManager from "../audio/MusicManager";
+import SfxManager from "../audio/SfxManager";
 
 export default class Menu extends Phaser.Scene {
   private static readonly MENU_MUSIC_KEY = "menu-theme";
+  private static readonly RAIN_SFX_KEY = "rain-sfx";
 
   constructor(){ super({ key: "Menu" }); }
 
@@ -14,6 +16,10 @@ export default class Menu extends Phaser.Scene {
     MusicManager.startForScene(this, Menu.MENU_MUSIC_KEY, {
       loop: true,
       volume: GameData.musicVolume ?? GameData.settings.audio
+    });
+    SfxManager.startForScene(this, Menu.RAIN_SFX_KEY, {
+      loop: true,
+      volume: GameData.sfxVolume ?? 0.35
     });
 
     const { width, height } = this.scale;

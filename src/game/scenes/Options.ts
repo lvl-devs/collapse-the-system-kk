@@ -3,16 +3,8 @@ import { GameData } from "../../GameData";
 import SfxManager from "../audio/SfxManager";
 import MusicManager from "../audio/MusicManager";
 
-type SliderConfig = {
-  label: string;
-  x: number;
-  y: number;
-  width: number;
-  initial: number; // 0..1
-  onChange: (v: number) => void;
-};
-
 export default class Options extends Phaser.Scene {
+
   private static readonly MENU_MUSIC_KEY = "menu-theme";
   private static readonly RAIN_SFX_KEY = "rain-sfx";
 
@@ -20,12 +12,19 @@ export default class Options extends Phaser.Scene {
     super("Options");
   }
 
+  preload(){
+    this.load.image("bg_options","../assets/images/bg_options.png");
+  }
+
   create() {
+
     this.sound.pauseOnBlur = false;
+
     MusicManager.start(this, Options.MENU_MUSIC_KEY, {
       loop: true,
-      volume: GameData.musicVolume ?? GameData.settings.audio
+      volume: GameData.musicVolume ?? 0.6
     });
+
     SfxManager.start(this, Options.RAIN_SFX_KEY, {
       loop: true,
       volume: GameData.sfxVolume ?? 0.35
@@ -33,224 +32,154 @@ export default class Options extends Phaser.Scene {
 
     const { width, height } = this.scale;
 
-    // Background
-    const bg = this.add.image(width / 2, height / 2, "bg_logo");
-    this.scaleToCover(bg, width, height);
-    bg.setAlpha(0.75);
+    // BACKGROUND
+    const bg = this.add.image(width/2, height/2, "bg_options");
+    const scale = Math.max(width/bg.width, height/bg.height);
+    bg.setScale(scale);
 
-    this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.25);
+    // =========================
+    // SLIDERS
+    // =========================
 
-    // Panel geometry (centrato)
-    const panelW = Math.round(width * 0.28);
-    const panelH = Math.round(height * 0.62);
-    const panelX = Math.round(width * 0.50);
-    const panelY = Math.round(height * 0.50);
-
-    const neon = 0x4fffbf;
-
-    // Panel outline
-    const panel = this.add.graphics();
-    panel.lineStyle(3, neon, 0.85);
-    this.roundRectStroke(panel, panelX - panelW / 2, panelY - panelH / 2, panelW, panelH, 14);
-
-    // Header box
-    const headerH = Math.round(height * 0.085);
-    const headerW = Math.round(panelW * 0.88);
-    const headerY = panelY - panelH / 2 - Math.round(height * 0.01);
-
-    const header = this.add.graphics();
-    header.lineStyle(3, neon, 0.85);
-    this.roundRectStroke(
-      header,
-      panelX - headerW / 2,
-      headerY,
-      headerW,
-      headerH,
-      10
+    this.createSlider(
+      width/2,
+      height/2 + 20, 
+      GameData.sfxVolume ?? 0.7,
+      (v:number)=>{
+        GameData.sfxVolume = v;
+      }
     );
 
-    const headerTxt = this.add
-      .text(panelX, headerY + headerH / 2, "SETTINGS", {
-        fontFamily: "monospace",
-        fontSize: `${Math.round(height * 0.055)}px`,
-        color: "#4fffbf",
-      })
-      .setOrigin(0.5);
-    headerTxt.setShadow(2, 2, "#0b5b47", 0, true, true);
-
-    // Inner “slots” (Sound Effects + Music) con box stile screenshot
-    const slotW = Math.round(panelW * 0.78);
-    const slotH = Math.round(height * 0.085);
-    const slotX = panelX;
-    const slot1Y = panelY - Math.round(panelH * 0.13);
-    const slot2Y = panelY;
-
-    this.drawSlot(slotX, slot1Y, slotW, slotH, "Sound Effects", neon, height);
-    this.drawSlot(slotX, slot2Y, slotW, slotH, "Music", neon, height);
-
-    // Slider bars
-    const sliderW = Math.round(slotW * 0.78);
-    const sliderX = panelX - sliderW / 2;
-    const slider1Y = slot1Y + Math.round(slotH * 0.58);
-    const slider2Y = slot2Y + Math.round(slotH * 0.58);
-
-    this.createSlider({
-      label: "sfx",
-      x: sliderX,
-      y: slider1Y,
-      width: sliderW,
-      initial: GameData.sfxVolume ?? 0.7,
-      onChange: (v) => {
-        GameData.sfxVolume = v;
-      },
-    });
-
-    this.createSlider({
-      label: "music",
-      x: sliderX,
-      y: slider2Y,
-      width: sliderW,
-      initial: GameData.musicVolume ?? 0.6,
-      onChange: (v) => {
+    this.createSlider(
+      width/2,
+      height/2 + 120, 
+      GameData.musicVolume ?? 0.6,
+      (v:number)=>{
         GameData.musicVolume = v;
-        // Se avete un'istanza di musica:
-        // GameData.music?.setVolume(v);
-      },
+      }
+    );
+
+    // =========================
+    // BACK BUTTON
+    // =========================
+
+    const back = this.add.text(
+      width/2,
+      height/2 + 200, 
+      "BACK",
+      {
+        fontFamily:"Pixelify Sans",
+        fontSize:"40px",
+        color:"#70fdc2"
+      }
+    )
+    .setOrigin(0.5)
+    .setInteractive({useHandCursor:true});
+
+    back.on("pointerover", ()=>{
+      back.setScale(1.1);
+      back.setColor("#ffffff");
     });
 
-    // Back button (cerchio)
-    const backR = Math.round(height * 0.05);
-    const backCX = panelX;
-    const backCY = panelY + Math.round(panelH * 0.32);
-
-    const backG = this.add.graphics();
-    backG.lineStyle(3, neon, 0.85);
-    backG.strokeCircle(backCX, backCY, backR);
-
-    const backTxt = this.add
-      .text(backCX, backCY, "Back", {
-        fontFamily: "monospace",
-        fontSize: `${Math.round(height * 0.03)}px`,
-        color: "#4fffbf",
-      })
-      .setOrigin(0.5);
-    backTxt.setShadow(2, 2, "#0b5b47", 0, true, true);
-
-    const backHit = this.add.circle(backCX, backCY, backR + 6, 0x000000, 0.001);
-    backHit.setDepth(20);
-    backHit.setInteractive({ useHandCursor: true })
-      .on("pointerover", () => {
-        backTxt.setColor("#a9ffe2");
-        backG.setAlpha(1);
-      })
-      .on("pointerout", () => {
-        backTxt.setColor("#4fffbf");
-        backG.setAlpha(0.85);
-      })
-      .on("pointerdown", () => {
-        SfxManager.start(this, "ui_click", { volume: 0.6 });
-        this.goBackToMenu();
-      });
-
-    backTxt
-      .setDepth(21)
-      .setInteractive({ useHandCursor: true })
-      .on("pointerdown", () => {
-        SfxManager.start(this, "ui_click", { volume: 0.6 });
-        this.goBackToMenu();
-      });
-
-    const escKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
-    escKey?.on("down", this.goBackToMenu, this);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      escKey?.off("down", this.goBackToMenu, this);
+    back.on("pointerout", ()=>{
+      back.setScale(1);
+      back.setColor("#70fdc2");
     });
+
+    back.on("pointerdown", ()=>{
+      SfxManager.start(this,"ui_click",{volume:0.6});
+      this.scene.start("Menu");
+    });
+
+    const neon = "#70fdc2";
+
+// ===== SETTINGS TITLE =====
+this.add.text(
+  width/2,
+  height/2 - 205,
+  "S E T T I N G S",
+  {
+    fontFamily: "Pixelify Sans",
+    fontSize: "48px",
+    color: neon
+  }
+)
+.setOrigin(0.5)
+
+
+// ===== SOUND EFFECTS =====
+this.add.text(
+  width/2,
+  height/2 - 27,
+  "SOUND EFFECTS",
+  {
+    fontFamily: "Pixelify Sans",
+    fontSize: "34px",
+    color: neon
+  }
+)
+.setOrigin(0.53)
+
+// ===== MUSIC =====
+this.add.text(
+  width/2,
+  height/2 + 72,
+  "MUSIC",
+  {
+    fontFamily: "Pixelify Sans",
+    fontSize: "34px",
+    color: neon
+  }
+)
+.setOrigin(0.55)
+
   }
 
-  private drawSlot(cx: number, cy: number, w: number, h: number, label: string, neon: number, screenH: number) {
-    const g = this.add.graphics();
-    g.lineStyle(3, neon, 0.85);
-    this.roundRectStroke(g, cx - w / 2, cy - h / 2, w, h, 10);
+  private createSlider(
+    cx:number,
+    cy:number,
+    initial:number,
+    callback:(v:number)=>void
+  ){
 
-    const t = this.add.text(cx, cy, label, {
-      fontFamily: "monospace",
-      fontSize: `${Math.round(screenH * 0.035)}px`,
-      color: "#e8fff7",
-    }).setOrigin(0.5);
+    const neon = 0x70fdc2;
+    const width = 260;
 
-    t.setShadow(2, 2, "#0b5b47", 0, true, true);
-  }
+    const line = this.add.rectangle(
+      cx,
+      cy,
+      width,
+      3,
+      neon
+    );
 
-  private createSlider(cfg: SliderConfig) {
-    const neon = 0x4fffbf;
-
-    // dotted baseline
-    const base = this.add.graphics();
-    base.lineStyle(2, neon, 0.45);
-    base.beginPath();
-    base.moveTo(cfg.x, cfg.y);
-    base.lineTo(cfg.x + cfg.width, cfg.y);
-    base.strokePath();
-
-    // small dots
-    const dots = this.add.graphics();
-    dots.fillStyle(neon, 0.35);
-    const step = 12;
-    for (let x = cfg.x; x <= cfg.x + cfg.width; x += step) {
-      dots.fillRect(x, cfg.y - 1, 4, 2);
-    }
-
-    // knob (quadratino)
-    const knobSize = 14;
-    const knob = this.add.rectangle(0, 0, knobSize, knobSize, 0x000000, 0.0);
-    knob.setStrokeStyle(3, neon, 0.9);
-
-    const startX = cfg.x + Phaser.Math.Clamp(cfg.initial, 0, 1) * cfg.width;
-    knob.setPosition(startX, cfg.y);
-
-    knob.setInteractive({ draggable: true, useHandCursor: true });
+    const knob = this.add.rectangle(
+      cx - width/2 + width*initial,
+      cy,
+      18,
+      18
+    )
+    .setStrokeStyle(3, neon)
+    .setFillStyle(0x000000,0.5)
+    .setInteractive({draggable:true, useHandCursor:true});
 
     this.input.setDraggable(knob);
 
-    const updateFromX = (px: number) => {
-      const clamped = Phaser.Math.Clamp(px, cfg.x, cfg.x + cfg.width);
+    knob.on("drag", (_:any, dragX:number)=>{
+
+      const min = cx - width/2;
+      const max = cx + width/2;
+
+      const clamped = Phaser.Math.Clamp(dragX, min, max);
+
       knob.x = clamped;
-      const v = (clamped - cfg.x) / cfg.width;
-      cfg.onChange(Phaser.Math.Clamp(v, 0, 1));
-    };
 
-    knob.on("drag", (_p: any, dragX: number) => updateFromX(dragX));
+      const v = (clamped-min)/width;
 
-    // anche click sulla linea
-    const hit = this.add.rectangle(cfg.x + cfg.width / 2, cfg.y, cfg.width, 28, 0x000000, 0.001);
-    hit.setInteractive({ useHandCursor: true }).on("pointerdown", (p: Phaser.Input.Pointer) => {
-      updateFromX(p.worldX);
+      callback(v);
+
     });
 
-    // init
-    cfg.onChange(Phaser.Math.Clamp(cfg.initial, 0, 1));
   }
 
-  private roundRectStroke(g: Phaser.GameObjects.Graphics, x: number, y: number, w: number, h: number, r: number) {
-    g.strokeRoundedRect(x, y, w, h, r);
-    // piccole “tacche” decorative (simile frame HUD)
-    g.lineStyle(2, 0x4fffbf, 0.5);
-    g.beginPath();
-    g.moveTo(x + 10, y);
-    g.lineTo(x + 26, y);
-    g.moveTo(x + w - 26, y + h);
-    g.lineTo(x + w - 10, y + h);
-    g.strokePath();
-  }
-
-  private scaleToCover(img: Phaser.GameObjects.Image, w: number, h: number) {
-    const iw = img.width;
-    const ih = img.height;
-    const scale = Math.max(w / iw, h / ih);
-    img.setScale(scale);
-  }
-
-  private goBackToMenu(): void {
-    this.scene.start("Menu");
-  }
 }

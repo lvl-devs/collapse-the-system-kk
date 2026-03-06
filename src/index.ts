@@ -7,6 +7,7 @@ import Boot from "./game/scenes/Boot";
 import Menu from "./game/scenes/Menu";
 import GamePlay from "./game/scenes/GamePlay";
 import Options from "./game/scenes/Options";
+import PauseMenu from "./game/scenes/PauseMenu";
 
 
 window.addEventListener("load", () => {
@@ -28,7 +29,8 @@ window.addEventListener("load", () => {
       Boot,
       Menu,
       GamePlay,
-      Options
+      Options,
+      PauseMenu
     ],
     physics: {
       default: "arcade",

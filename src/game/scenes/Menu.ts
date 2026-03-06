@@ -13,6 +13,12 @@ export default class Menu extends Phaser.Scene {
 
   constructor(){ super({ key: "Menu" }); }
 
+  private playSelectSfx(): void {
+    if (localStorage.getItem("soundEffectsEnabled") === "true") {
+      this.sound.play("menuSelect");
+    }
+  }
+
   create(){
     this.sound.pauseOnBlur = false;
     AssetPipeline.startDeferredPreload(this);
@@ -66,8 +72,7 @@ export default class Menu extends Phaser.Scene {
         })
 
         .on("pointerdown", () => {
-          if(localStorage.getItem("soundEffectsEnabled") === "true")
-            this.sound.play("menuSelect");
+          this.playSelectSfx();
           this.selectItem(index);
         });
       this._menuItems.push(menuItem);
@@ -78,26 +83,22 @@ export default class Menu extends Phaser.Scene {
     this.input.keyboard!.on("keydown-UP", () => {
       this._selectedIndex = (this._selectedIndex - 1 + this._menuItems.length) % this._menuItems.length;
       this.updateMenu();
-      if(localStorage.getItem("soundEffectsEnabled") === "true")
-        this.sound.play("menuSelect");
+      this.playSelectSfx();
     });
 
     this.input.keyboard!.on("keydown-DOWN", () => {
       this._selectedIndex = (this._selectedIndex + 1) % this._menuItems.length;
       this.updateMenu();
-      if(localStorage.getItem("soundEffectsEnabled") === "true")
-        this.sound.play("menuSelect");
+      this.playSelectSfx();
     });
 
     this.input.keyboard!.on("keydown-ENTER", () => {
-      if(localStorage.getItem("soundEffectsEnabled") === "true")
-        this.sound.play("menuSelect");
+      this.playSelectSfx();
       this.selectItem(this._selectedIndex);
     });
 
     this.input.keyboard!.on("keydown-SPACE", () => {
-      if(localStorage.getItem("soundEffectsEnabled") === "true")
-        this.sound.play("menuSelect");
+      this.playSelectSfx();
       this.selectItem(this._selectedIndex);
     });
   }

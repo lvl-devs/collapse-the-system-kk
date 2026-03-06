@@ -1,12 +1,3 @@
-// ====================================================================
-// GamePlay.ts
-// Scena principale di gioco — genera il dungeon e gestisce il player
-//
-// Architettura basata su:
-// "Modular Game Worlds in Phaser 3 (Tilemaps #3) - Procedural Dungeon"
-// di Michael Hadley
-// ====================================================================
-
 import Phaser from "phaser";
 import { GameData } from "../../GameData";
 import DungeonGenerator from "../systems/DungeonGenerator";
@@ -18,13 +9,8 @@ import { DEFAULT_TILES } from "../systems/TileMapping";
 const PLAYER_SPEED = 160;
 
 export default class GamePlay extends Phaser.Scene {
-  // ── Layer / mappa ──────────────────────────────────────────────────
   private dungeonResult!: DungeonBuildResult;
-
-  // ── Player ─────────────────────────────────────────────────────────
   private player!: Phaser.Physics.Arcade.Sprite;
-
-  // ── Input ──────────────────────────────────────────────────────────
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: {
     up: Phaser.Input.Keyboard.Key;
@@ -32,55 +18,24 @@ export default class GamePlay extends Phaser.Scene {
     left: Phaser.Input.Keyboard.Key;
     right: Phaser.Input.Keyboard.Key;
   };
-
-  // ── Stato scena ───────────────────────────────────────────────────
   private hasPlayerReachedStairs = false;
   private level = 0;
   private debugMode = false;
   private tileDebugGraphics?: Phaser.GameObjects.Graphics;
+  private lastDirection: "up" | "down" | "left" | "right" = "down";
 
   constructor() {
     super({ key: "GamePlay" });
   }
 
-  // ───────────────────────────────────────────────────────────────────
-  // PRELOAD
-  // ───────────────────────────────────────────────────────────────────
-
   preload() {
-    // Carica gli asset differiti (audio, immagini extra, ecc.)
     AssetPipeline.startDeferredPreload(this);
-
-    // Crea una texture placeholder per il player (canvas ciano 12x12)
-    if (!this.textures.exists("player-placeholder")) {
-      const tex = this.textures.createCanvas("player-placeholder", 12, 12);
-      if (tex) {
-        const ctx = tex.getContext();
-        ctx.fillStyle = "#00aaff";
-        ctx.fillRect(0, 0, 12, 12);
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(0.5, 0.5, 11, 11);
-        tex.refresh();
-      }
-    }
   }
-
-  // ───────────────────────────────────────────────────────────────────
-  // CREATE
-  // Struttura identica alla guida di Michael Hadley:
-  //   1. Genera dungeon (DungeonGenerator.buildTilemap)
-  //   2. Posiziona il player nella startRoom
-  //   3. Collisioni player vs groundLayer e stuffLayer
-  //   4. Callback scala -> livello successivo (scene.restart)
-  //   5. Camera segue il player, bounded alla mappa
-  // ───────────────────────────────────────────────────────────────────
 
   create() {
     this.level++;
     this.hasPlayerReachedStairs = false;
 
-    // ── 1. Genera il dungeon ────────────────────────────────────────
     const cfg = GameData.dungeon.defaultConfig;
     this.dungeonResult = DungeonGenerator.buildTilemap(this, {
       ...cfg,
@@ -89,7 +44,6 @@ export default class GamePlay extends Phaser.Scene {
 
     const { groundLayer, stuffLayer, startX, startY, map } = this.dungeonResult;
 
-    // ── 2. Sfondo camera ────────────────────────────────────────────
     const theme = GameData.dungeon.defaultTheme;
     const bgColors: Record<string, string> = {
       cyber:    "#04040f",
@@ -99,19 +53,48 @@ export default class GamePlay extends Phaser.Scene {
     };
     this.cameras.main.setBackgroundColor(bgColors[theme] ?? "#000000");
 
-    // ── 3. Player ───────────────────────────────────────────────────
-    this.player = this.physics.add.sprite(startX, startY, "player-placeholder");
+    // Create player sprite with hacker spritesheet
+    this.player = this.physics.add.sprite(startX, startY, "hacker", 0);
     this.player.setDepth(10);
     this.player.setBounce(0);
     this.player.setCollideWorldBounds(true);
 
-    // ── 4. Collisioni ───────────────────────────────────────────────
+    // Create animations
+    this.anims.create({
+      key: "walk-down",
+      frames: this.anims.generateFrameNumbers("hacker", { start: 0, end: 2 }),
+      frameRate: 8,
+      repeat: -1,
+    });
+
+    this.anims.create({
+      key: "walk-left",
+      frames: this.anims.generateFrameNumbers("hacker", { start: 3, end: 5 }),
+      frameRate: 8,
+      repeat: -1,
+    });
+
+    this.anims.create({
+      key: "walk-right",
+      frames: this.anims.generateFrameNumbers("hacker", { start: 6, end: 8 }),
+      frameRate: 8,
+      repeat: -1,
+    });
+
+    this.anims.create({
+      key: "walk-up",
+      frames: this.anims.generateFrameNumbers("hacker", { start: 9, end: 11 }),
+      frameRate: 8,
+      repeat: -1,
+    });
+
+    // Set idle frame based on starting direction
+    this.player.setFrame(0);
+
     this.physics.add.collider(this.player, groundLayer);
     this.physics.add.collider(this.player, stuffLayer);
 
-    // ── 5. Callback scale -> livello successivo ──────────────────────
-    // Quando il player calpesta la tile "STAIRS" nella stuffLayer,
-    // la scena riparte (nuovo dungeon generato, livello incrementato)
+    // Stairs callback: restart scene on next level
     stuffLayer.setTileIndexCallback(DEFAULT_TILES.STAIRS, () => {
       stuffLayer.setTileIndexCallback(DEFAULT_TILES.STAIRS, () => {}, this);
       this.hasPlayerReachedStairs = true;
@@ -124,11 +107,8 @@ export default class GamePlay extends Phaser.Scene {
       });
     }, this);
 
-    // ── 6. Camera ────────────────────────────────────────────────────
-    // setBounds e' gia' chiamato dentro DungeonGenerator.buildTilemap()
     this.cameras.main.startFollow(this.player, true, 0.1, 0.1);
 
-    // ── 7. Input ─────────────────────────────────────────────────────
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.wasd = {
       up:    this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W),
@@ -137,23 +117,19 @@ export default class GamePlay extends Phaser.Scene {
       right: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D),
     };
 
-    // ESC -> Menu
     this.input.keyboard!.once("keydown-ESC", () => {
       MusicManager.stop(this, "game-theme");
       this.scene.start("Menu");
     });
 
-    // C -> toggle collision debug (sprite bodies + tile collision boxes)
     this.input.keyboard!.on("keydown-C", () => {
       this.debugMode = !this.debugMode;
       const { groundLayer, stuffLayer } = this.dungeonResult;
 
       if (this.debugMode) {
-        // Sprite / body debug
         this.physics.world.drawDebug = true;
         this.physics.world.createDebugGraphic();
 
-        // Tile debug: rettangoli rossi sui tile con collisione attiva
         this.tileDebugGraphics = this.add.graphics().setDepth(50);
         groundLayer.renderDebug(this.tileDebugGraphics, {
           tileColor:         null,
@@ -174,9 +150,8 @@ export default class GamePlay extends Phaser.Scene {
       }
     });
 
-    // ── 8. HUD ───────────────────────────────────────────────────────
     this.add
-      .text(16, 16, `Livello: ${this.level}\nESC -> Menu`, {
+      .text(16, 16, `Level: ${this.level}\nESC -> Menu`, {
         fontFamily: GameData.globals.defaultFont.key,
         fontSize:   "14px",
         color:      "#aaaacc",
@@ -186,7 +161,6 @@ export default class GamePlay extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(100);
 
-    // Hint debug
     this.add
       .text(16, 48, "C -> collision debug", {
         fontFamily: GameData.globals.defaultFont.key,
@@ -199,23 +173,51 @@ export default class GamePlay extends Phaser.Scene {
       .setDepth(100);
 
     console.log(
-      `[GamePlay] Livello ${this.level} -- ${map.width}x${map.height} tile` +
-      ` -- ${this.dungeonResult.dungeon.rooms.length} stanze` +
-      ` -- tema: ${GameData.dungeon.defaultTheme}`
+      `[GamePlay] Level ${this.level} -- ${map.width}x${map.height} tiles` +
+      ` -- ${this.dungeonResult.dungeon.rooms.length} rooms` +
+      ` -- theme: ${GameData.dungeon.defaultTheme}`
     );
   }
 
   update() {
     if (this.hasPlayerReachedStairs) return;
 
-    const left  = this.wasd.left.isDown  || this.cursors.left.isDown;
+    const left = this.wasd.left.isDown || this.cursors.left.isDown;
     const right = this.wasd.right.isDown || this.cursors.right.isDown;
-    const up    = this.wasd.up.isDown    || this.cursors.up.isDown;
-    const down  = this.wasd.down.isDown  || this.cursors.down.isDown;
+    const up = this.wasd.up.isDown || this.cursors.up.isDown;
+    const down = this.wasd.down.isDown || this.cursors.down.isDown;
 
     const vx = left ? -PLAYER_SPEED : right ? PLAYER_SPEED : 0;
-    const vy = up   ? -PLAYER_SPEED : down  ? PLAYER_SPEED : 0;
+    const vy = up ? -PLAYER_SPEED : down ? PLAYER_SPEED : 0;
 
     this.player.setVelocity(vx, vy);
+
+    // Handle animations based on movement direction
+    if (vx !== 0 || vy !== 0) {
+      // Prioritize vertical movement, then horizontal
+      if (vy < 0) {
+        this.player.play("walk-up", true);
+        this.lastDirection = "up";
+      } else if (vy > 0) {
+        this.player.play("walk-down", true);
+        this.lastDirection = "down";
+      } else if (vx < 0) {
+        this.player.play("walk-left", true);
+        this.lastDirection = "left";
+      } else if (vx > 0) {
+        this.player.play("walk-right", true);
+        this.lastDirection = "right";
+      }
+    } else {
+      // Idle: stop animation and show first frame of last direction
+      this.player.stop();
+      const idleFrames = {
+        up:    9,
+        down:  0,
+        left:  3,
+        right: 6,
+      };
+      this.player.setFrame(idleFrames[this.lastDirection]);
+    }
   }
 }

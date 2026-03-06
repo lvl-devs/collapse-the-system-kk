@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { GameData } from "../../GameData"; // adattalo se il path è diverso
+import { GameData } from "../../GameData";
 import SfxManager from "../audio/SfxManager";
 
 type SliderConfig = {
@@ -7,7 +7,7 @@ type SliderConfig = {
   x: number;
   y: number;
   width: number;
-  initial: number; // 0..1
+  initial: number;
   onChange: (v: number) => void;
 };
 
@@ -19,14 +19,12 @@ export default class Options extends Phaser.Scene {
   create() {
     const { width, height } = this.scale;
 
-    // Background (leggermente “spento” come nello screenshot)
     const bg = this.add.image(width / 2, height / 2, "bg_logo");
     this.scaleToCover(bg, width, height);
     bg.setAlpha(0.75);
 
     this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.25);
 
-    // Panel geometry (centrato)
     const panelW = Math.round(width * 0.28);
     const panelH = Math.round(height * 0.62);
     const panelX = Math.round(width * 0.50);
@@ -34,12 +32,10 @@ export default class Options extends Phaser.Scene {
 
     const neon = 0x4fffbf;
 
-    // Panel outline
     const panel = this.add.graphics();
     panel.lineStyle(3, neon, 0.85);
     this.roundRectStroke(panel, panelX - panelW / 2, panelY - panelH / 2, panelW, panelH, 14);
 
-    // Header box
     const headerH = Math.round(height * 0.085);
     const headerW = Math.round(panelW * 0.88);
     const headerY = panelY - panelH / 2 - Math.round(height * 0.01);
@@ -64,7 +60,6 @@ export default class Options extends Phaser.Scene {
       .setOrigin(0.5);
     headerTxt.setShadow(2, 2, "#0b5b47", 0, true, true);
 
-    // Inner “slots” (Sound Effects + Music) con box stile screenshot
     const slotW = Math.round(panelW * 0.78);
     const slotH = Math.round(height * 0.085);
     const slotX = panelX;
@@ -74,7 +69,6 @@ export default class Options extends Phaser.Scene {
     this.drawSlot(slotX, slot1Y, slotW, slotH, "Sound Effects", neon, height);
     this.drawSlot(slotX, slot2Y, slotW, slotH, "Music", neon, height);
 
-    // Slider bars
     const sliderW = Math.round(slotW * 0.78);
     const sliderX = panelX - sliderW / 2;
     const slider1Y = slot1Y + Math.round(slotH * 0.58);
@@ -99,12 +93,9 @@ export default class Options extends Phaser.Scene {
       initial: GameData.musicVolume ?? 0.6,
       onChange: (v) => {
         GameData.musicVolume = v;
-        // Se avete un'istanza di musica:
-        // GameData.music?.setVolume(v);
       },
     });
 
-    // Back button (cerchio)
     const backR = Math.round(height * 0.05);
     const backCX = panelX;
     const backCY = panelY + Math.round(panelH * 0.32);
@@ -137,7 +128,6 @@ export default class Options extends Phaser.Scene {
         this.scene.start("Menu");
       });
 
-    // Responsivo
     this.scale.on("resize", () => this.scene.restart());
   }
 
@@ -158,7 +148,6 @@ export default class Options extends Phaser.Scene {
   private createSlider(cfg: SliderConfig) {
     const neon = 0x4fffbf;
 
-    // dotted baseline
     const base = this.add.graphics();
     base.lineStyle(2, neon, 0.45);
     base.beginPath();
@@ -166,7 +155,6 @@ export default class Options extends Phaser.Scene {
     base.lineTo(cfg.x + cfg.width, cfg.y);
     base.strokePath();
 
-    // small dots
     const dots = this.add.graphics();
     dots.fillStyle(neon, 0.35);
     const step = 12;
@@ -174,7 +162,6 @@ export default class Options extends Phaser.Scene {
       dots.fillRect(x, cfg.y - 1, 4, 2);
     }
 
-    // knob (quadratino)
     const knobSize = 14;
     const knob = this.add.rectangle(0, 0, knobSize, knobSize, 0x000000, 0.0);
     knob.setStrokeStyle(3, neon, 0.9);
@@ -193,21 +180,18 @@ export default class Options extends Phaser.Scene {
       cfg.onChange(Phaser.Math.Clamp(v, 0, 1));
     };
 
-    knob.on("drag", (_p: any, dragX: number) => updateFromX(dragX));
+    knob.on("drag", (_p: unknown, dragX: number) => updateFromX(dragX));
 
-    // anche click sulla linea
     const hit = this.add.rectangle(cfg.x + cfg.width / 2, cfg.y, cfg.width, 28, 0x000000, 0.001);
     hit.setInteractive({ useHandCursor: true }).on("pointerdown", (p: Phaser.Input.Pointer) => {
       updateFromX(p.worldX);
     });
 
-    // init
     cfg.onChange(Phaser.Math.Clamp(cfg.initial, 0, 1));
   }
 
   private roundRectStroke(g: Phaser.GameObjects.Graphics, x: number, y: number, w: number, h: number, r: number) {
     g.strokeRoundedRect(x, y, w, h, r);
-    // piccole “tacche” decorative (simile frame HUD)
     g.lineStyle(2, 0x4fffbf, 0.5);
     g.beginPath();
     g.moveTo(x + 10, y);

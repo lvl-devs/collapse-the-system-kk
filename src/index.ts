@@ -1,7 +1,6 @@
 import "phaser";
 import { GameData } from "./GameData";
 
-// scenes
 import Preloader from "./game/scenes/Preloader";
 import Boot from "./game/scenes/Boot";
 import Menu from "./game/scenes/Menu";
@@ -18,21 +17,13 @@ window.addEventListener("load", () => {
     parent: "app",
     scale: {
       mode: Phaser.Scale.FIT,
-      // width: GameData.globals.gameWidth,
-      // height: GameData.globals.gameHeight,
       width: window.innerWidth,
       height: window.innerHeight,
     },
-    scene: [
-      Preloader,
-      Boot,
-      Menu,
-      GamePlay,
-      Options
-    ],
+    scene: [Preloader, Boot, Menu, GamePlay, Options],
     physics: {
       default: "arcade",
-      arcade: { debug: false, }
+      arcade: { debug: false }
     },
     input: {
       activePointers: 2,
@@ -43,9 +34,9 @@ window.addEventListener("load", () => {
       antialias: false,
     },
     loader: {
-      baseURL: '/assets/',
-    },
+      baseURL: "/assets/"
+    }
   };
 
-  new Phaser.Game(config); // game initializing according to configs
+  new Phaser.Game(config);
 });

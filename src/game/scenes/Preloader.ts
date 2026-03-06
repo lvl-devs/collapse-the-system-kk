@@ -19,8 +19,10 @@ export default class Preloader extends Phaser.Scene {
 
   preload(){
     this.cameras.main.setBackgroundColor(GameData.globals.bgColor);
-    this.load.script('webfont', 'https://ajax.googleapis.com/ajax/libs/webfont/1.6.26/webfont.js');
-    this.load.on('progress', (value: any) => this._loadingText.setText(`Loading: ${Math.round(value * 100)}%`) );
+    this.load.script("webfont", "https://ajax.googleapis.com/ajax/libs/webfont/1.6.26/webfont.js");
+    this.load.on("progress", (value: number) => {
+      this._loadingText.setText(`Loading: ${Math.round(value * 100)}%`);
+    });
     this.loadAssets();
   }
 
@@ -36,8 +38,7 @@ export default class Preloader extends Phaser.Scene {
 
   update(){ this._image.angle += 1; }
 
-  loadAssets(){
-    this.load.on("start", () => { });
+  private loadAssets(){
     this.load.on("complete", () => {
       this.scene.stop(this);
       this.scene.start("Boot");
@@ -45,16 +46,12 @@ export default class Preloader extends Phaser.Scene {
 
     AssetPipeline.preloadCritical(this);
 
-    // WEB FONTS
-    if (GameData.webfonts != null) {
-      GameData.webfonts.forEach((font) => {
-        const googleFontUrl = `https://fonts.googleapis.com/css2?family=${font.key.replace(/ /g, '+')}:wght@100;200;300;400;500;600;700;800;900&display=swap`;
-        const fontStyle = document.createElement('link');
-        fontStyle.rel = 'stylesheet';
-        fontStyle.href = googleFontUrl;
-        document.head.appendChild(fontStyle);
-      });
-    }
+    GameData.webfonts?.forEach((font) => {
+      const googleFontUrl = `https://fonts.googleapis.com/css2?family=${font.key.replace(/ /g, "+")}:wght@100;200;300;400;500;600;700;800;900&display=swap`;
+      const fontStyle = document.createElement("link");
+      fontStyle.rel = "stylesheet";
+      fontStyle.href = googleFontUrl;
+      document.head.appendChild(fontStyle);
+    });
   }
-
 }

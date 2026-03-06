@@ -130,6 +130,7 @@ export default class Menu extends Phaser.Scene {
 
   private selectItem(index: number){
     const item = GameData.menu.items[index];
+    console.log("[Menu] selectItem - starting scene:", item.scene);
     if (item.scene === "GamePlay") {
       MusicManager.stop(this, Menu.MENU_MUSIC_KEY);
       SfxManager.stop(this, Menu.RAIN_SFX_KEY);

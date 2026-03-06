@@ -4,10 +4,17 @@ import SfxManager from "../audio/SfxManager";
 import MusicManager from "../audio/MusicManager";
 import SettingsStorage from "../systems/SettingsStorage";
 
+type OptionsSceneData = {
+  returnMode?: "menu" | "pause";
+  pauseMenuSceneKey?: string;
+};
+
 export default class Options extends Phaser.Scene {
 
   private static readonly MENU_MUSIC_KEY = "menu-theme";
   private static readonly RAIN_SFX_KEY = "rain-sfx";
+  private returnMode: "menu" | "pause" = "menu";
+  private pauseMenuSceneKey = "PauseMenu";
 
   constructor() {
     super("Options");
@@ -17,20 +24,29 @@ export default class Options extends Phaser.Scene {
     this.load.image("bg_options","../assets/images/bg_options.png");
   }
 
+  init(data: OptionsSceneData): void {
+    this.returnMode = data.returnMode ?? "menu";
+    this.pauseMenuSceneKey = data.pauseMenuSceneKey ?? "PauseMenu";
+    console.log("[Options] init with returnMode:", this.returnMode, "pauseMenuKey:", this.pauseMenuSceneKey);
+  }
+
   create() {
+    console.log("[Options] create() called");
     SettingsStorage.loadVolumeSettings();
 
     this.sound.pauseOnBlur = false;
 
-    MusicManager.start(this, Options.MENU_MUSIC_KEY, {
-      loop: true,
-      volume: MusicManager.toEngineVolume(GameData.musicVolume ?? 0.6)
-    });
+    if (this.returnMode === "menu") {
+      MusicManager.start(this, Options.MENU_MUSIC_KEY, {
+        loop: true,
+        volume: MusicManager.toEngineVolume(GameData.musicVolume ?? 0.6)
+      });
 
-    SfxManager.start(this, Options.RAIN_SFX_KEY, {
-      loop: true,
-      volume: GameData.sfxVolume ?? 0.7
-    });
+      SfxManager.start(this, Options.RAIN_SFX_KEY, {
+        loop: true,
+        volume: GameData.sfxVolume ?? 0.7
+      });
+    }
 
     const { width, height } = this.scale;
 
@@ -51,7 +67,9 @@ export default class Options extends Phaser.Scene {
         GameData.sfxVolume = v;
         SettingsStorage.saveSfxVolume(v);
 
-        SfxManager.setVolume(this, Options.RAIN_SFX_KEY, v);
+        if (this.returnMode === "menu") {
+          SfxManager.setVolume(this, Options.RAIN_SFX_KEY, v);
+        }
       }
     );
 
@@ -63,10 +81,12 @@ export default class Options extends Phaser.Scene {
         GameData.musicVolume = v;
         SettingsStorage.saveMusicVolume(v);
 
-        MusicManager.start(this, Options.MENU_MUSIC_KEY, {
-          loop: true,
-          volume: MusicManager.toEngineVolume(v)
-        });
+        if (this.returnMode === "menu") {
+          MusicManager.start(this, Options.MENU_MUSIC_KEY, {
+            loop: true,
+            volume: MusicManager.toEngineVolume(v)
+          });
+        }
       }
     );
 
@@ -99,7 +119,13 @@ export default class Options extends Phaser.Scene {
 
     back.on("pointerdown", ()=>{
       SfxManager.start(this,"ui_click",{volume:0.6 * (GameData.sfxVolume ?? 0.7)});
-      this.scene.start("Menu");
+      this.goBack();
+    });
+
+    const escKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+    escKey?.on("down", this.goBack, this);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      escKey?.off("down", this.goBack, this);
     });
 
     const neon = "#70fdc2";
@@ -191,6 +217,18 @@ this.add.text(
 
     });
 
+  }
+
+  private goBack(): void {
+    if (this.returnMode === "pause") {
+      console.log("[Options] Going back to pause menu:", this.pauseMenuSceneKey);
+      this.scene.stop();
+      this.scene.resume(this.pauseMenuSceneKey);
+      return;
+    }
+
+    console.log("[Options] Going back to main menu");
+    this.scene.start("Menu");
   }
 
 }

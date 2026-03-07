@@ -3,6 +3,7 @@ import GameData from "../../GameData";
 import AssetPipeline from "../systems/AssetPipeline";
 import MusicManager from "../audio/MusicManager";
 import SfxManager from "../audio/SfxManager";
+import SettingsStorage from "../systems/SettingsStorage";
 
 export default class Menu extends Phaser.Scene {
   private static readonly MENU_MUSIC_KEY = "menu-theme";
@@ -14,6 +15,8 @@ export default class Menu extends Phaser.Scene {
   constructor(){ super({ key: "Menu" }); }
 
   create(){
+    SettingsStorage.loadVolumeSettings();
+
     this._selectedIndex = 0;
     this._menuItems = [];
 
@@ -21,11 +24,11 @@ export default class Menu extends Phaser.Scene {
     AssetPipeline.startDeferredPreload(this);
     MusicManager.start(this, Menu.MENU_MUSIC_KEY, {
       loop: true,
-      volume: GameData.musicVolume ?? GameData.settings.audio
+      volume: MusicManager.toEngineVolume(GameData.musicVolume ?? 0.6)
     });
     SfxManager.start(this, Menu.RAIN_SFX_KEY, {
       loop: true,
-      volume: GameData.sfxVolume ?? 0.35
+      volume: GameData.sfxVolume ?? 0.7
     });
     const { width, height } = this.scale;
     const bgVideo = this.add.video(width / 2, height / 2, "bg-menu");
@@ -127,6 +130,7 @@ export default class Menu extends Phaser.Scene {
 
   private selectItem(index: number){
     const item = GameData.menu.items[index];
+    console.log("[Menu] selectItem - starting scene:", item.scene);
     if (item.scene === "GamePlay") {
       MusicManager.stop(this, Menu.MENU_MUSIC_KEY);
       SfxManager.stop(this, Menu.RAIN_SFX_KEY);

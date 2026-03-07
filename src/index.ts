@@ -8,7 +8,7 @@ import Menu from "./game/scenes/Menu";
 import GamePlay from "./game/scenes/GamePlay";
 import Options from "./game/scenes/Options";
 import Credits from "./game/scenes/Credits";
-
+import PauseMenu from "./game/scenes/PauseMenu";
 
 window.addEventListener("load", () => {
   const config: Phaser.Types.Core.GameConfig = {
@@ -31,10 +31,11 @@ window.addEventListener("load", () => {
       GamePlay,
       Options,
       Credits,
+      PauseMenu,
     ],
     physics: {
       default: "arcade",
-      arcade: { debug: false, }
+      arcade: { debug: false }
     },
     input: {
       activePointers: 2,
@@ -45,9 +46,9 @@ window.addEventListener("load", () => {
       antialias: false,
     },
     loader: {
-      baseURL: '/assets/',
+      baseURL: "/assets/",
     },
   };
 
-  new Phaser.Game(config); // game initializing according to configs
+  new Phaser.Game(config);
 });

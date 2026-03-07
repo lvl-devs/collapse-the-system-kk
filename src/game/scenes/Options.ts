@@ -2,6 +2,12 @@ import Phaser from "phaser";
 import { GameData } from "../../GameData";
 import SfxManager from "../audio/SfxManager";
 import MusicManager from "../audio/MusicManager";
+import SettingsStorage from "../systems/SettingsStorage";
+
+type OptionsSceneData = {
+  returnMode?: "menu" | "pause";
+  pauseMenuSceneKey?: string;
+};
 
 type SliderCfg = {
   cx: number;
@@ -20,8 +26,11 @@ export default class Options extends Phaser.Scene {
   private static readonly MENU_MUSIC_KEY = "menu-theme";
   private static readonly RAIN_SFX_KEY = "rain-sfx";
 
-  private menuMusic?: Phaser.Sound.WebAudioSound | Phaser.Sound.HTML5AudioSound;
-  private rainSfx?: Phaser.Sound.WebAudioSound | Phaser.Sound.HTML5AudioSound;
+  private returnMode: "menu" | "pause" = "menu";
+  private pauseMenuSceneKey = "PauseMenu";
+
+  private menuMusic?: Phaser.Sound.BaseSound;
+  private rainSfx?: Phaser.Sound.BaseSound;
 
   constructor() {
     super("Options");
@@ -31,50 +40,50 @@ export default class Options extends Phaser.Scene {
     this.load.image("bg_options", "../assets/images/bg_credits.png");
   }
 
+  init(data: OptionsSceneData): void {
+    this.returnMode = data.returnMode ?? "menu";
+    this.pauseMenuSceneKey = data.pauseMenuSceneKey ?? "PauseMenu";
+  }
+
   create() {
+    SettingsStorage.loadVolumeSettings();
     this.sound.pauseOnBlur = false;
 
-    // Audio (come già fai)
-    this.menuMusic = MusicManager.start(this, Options.MENU_MUSIC_KEY, {
-      loop: true,
-      volume: GameData.musicVolume ?? 0.6,
-    }) as Phaser.Sound.WebAudioSound | Phaser.Sound.HTML5AudioSound;
+    if (this.returnMode === "menu") {
+      this.menuMusic = MusicManager.start(this, Options.MENU_MUSIC_KEY, {
+        loop: true,
+        volume: MusicManager.toEngineVolume(GameData.musicVolume ?? 0.6),
+      });
 
-    this.rainSfx = SfxManager.start(this, Options.RAIN_SFX_KEY, {
-      loop: true,
-      volume: GameData.sfxVolume ?? 0.35,
-    }) as Phaser.Sound.WebAudioSound | Phaser.Sound.HTML5AudioSound;
+      this.rainSfx = SfxManager.start(this, Options.RAIN_SFX_KEY, {
+        loop: true,
+        volume: GameData.sfxVolume ?? 0.7,
+      });
+    }
 
     const { width, height } = this.scale;
 
-    // ===== BACKGROUND =====
     const bg = this.add.image(width / 2, height / 2, "bg_options");
     const bgScale = Math.max(width / bg.width, height / bg.height);
     bg.setScale(bgScale);
     bg.setAlpha(0.9);
 
-    // Overlay scuro per leggibilità
     this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.35);
 
-    // ===== LAYOUT RESPONSIVE =====
     const uBase = Math.min(width, height);
-
-    // fattore di “fit” quando l’altezza è poca (zoom alto / finestra bassa)
     const fit = Phaser.Math.Clamp(height / (uBase * 1.05), 0.72, 1);
-
     const u = uBase * fit;
     const neon = 0x70fdc2;
 
     const panelW = Phaser.Math.Clamp(u * 0.52, 360, 520);
-    const panelH = Phaser.Math.Clamp(u * 0.70, 420, 640);
+    const panelH = Phaser.Math.Clamp(u * 0.7, 420, 640);
 
     const panelX = width / 2;
     const panelY = height / 2 + u * 0.02;
 
     const headerW = panelW * 0.78;
-    const headerH = u * 0.10;
+    const headerH = u * 0.1;
 
-    // ===== HEADER =====
     const headerY = panelY - panelH / 2 - headerH * 0.75;
     const headerBox = this.drawHudBox(panelX, headerY, headerW, headerH, neon, true);
 
@@ -86,20 +95,17 @@ export default class Options extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    // ===== MAIN PANEL =====
     const panelBox = this.drawHudPanel(panelX, panelY, panelW, panelH, neon);
 
-    // ===== SLOT BOXES =====
     const slotW = panelW * 0.78;
     const slotH = u * 0.12;
 
-    const slot1Y = panelY - panelH * 0.30;
+    const slot1Y = panelY - panelH * 0.3;
     const slot2Y = panelY - panelH * 0.04;
 
     const slot1Box = this.drawHudBox(panelX, slot1Y, slotW, slotH, neon, false);
     const slot2Box = this.drawHudBox(panelX, slot2Y, slotW, slotH, neon, false);
 
-    // ===== LABELS =====
     const labelSize = Math.round(u * 0.05);
 
     const sfxLabel = this.add
@@ -118,8 +124,7 @@ export default class Options extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    // ===== SLIDERS =====
-    const sliderW = slotW * 1.00;
+    const sliderW = slotW;
     const slider1Y = slot1Y + slotH * 0.74;
     const slider2Y = slot2Y + slotH * 0.74;
 
@@ -130,7 +135,12 @@ export default class Options extends Phaser.Scene {
       initial: GameData.sfxVolume ?? 0.7,
       onChange: (v) => {
         GameData.sfxVolume = v;
-        if (this.rainSfx) this.rainSfx.setVolume(v);
+        SettingsStorage.saveSfxVolume(v);
+
+        if (this.returnMode === "menu") {
+          if (this.rainSfx) this.rainSfx.setVolume(v);
+          else SfxManager.setVolume(this, Options.RAIN_SFX_KEY, v);
+        }
       },
     });
 
@@ -141,11 +151,21 @@ export default class Options extends Phaser.Scene {
       initial: GameData.musicVolume ?? 0.6,
       onChange: (v) => {
         GameData.musicVolume = v;
-        if (this.menuMusic) this.menuMusic.setVolume(v);
+        SettingsStorage.saveMusicVolume(v);
+
+        if (this.returnMode === "menu") {
+          const engineV = MusicManager.toEngineVolume(v);
+          if (this.menuMusic) this.menuMusic.setVolume(engineV);
+          else {
+            this.menuMusic = MusicManager.start(this, Options.MENU_MUSIC_KEY, {
+              loop: true,
+              volume: engineV,
+            });
+          }
+        }
       },
     });
 
-    // ===== BACK =====
     const backY = panelY + panelH * 0.32;
 
     const backText = this.add
@@ -168,23 +188,22 @@ export default class Options extends Phaser.Scene {
     });
 
     backText.on("pointerdown", () => {
-      SfxManager.start(this, "ui_click", { volume: 0.6 });
-      this.scene.start("Menu");
+      SfxManager.start(this, "ui_click", { volume: 0.6 * (GameData.sfxVolume ?? 0.7) });
+      this.goBack();
     });
 
-    // ESC per tornare indietro
     const escKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
-    escKey?.on("down", () => this.scene.start("Menu"));
+    escKey?.on("down", this.goBack, this);
 
     this.scale.on("resize", () => {
-    this.scene.restart();
-  });
+      this.scene.restart();
+    });
 
-  this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-    this.scale.off("resize");
-  });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      escKey?.off("down", this.goBack, this);
+      this.scale.off("resize");
+    });
 
-    // ✅ INTRO (sempre, ogni volta che entri nella scena)
     this.playIntro([
       headerBox,
       headerText,
@@ -199,20 +218,23 @@ export default class Options extends Phaser.Scene {
     ]);
   }
 
-  // ==============================
-  // INTRO (fade + slide) stile Credits
-  // ==============================
-  private playIntro(objs: Phaser.GameObjects.GameObject[]) {
-    // reset stato
-    for (const o of objs) {
-      // @ts-expect-error: setAlpha/setY esistono su quasi tutti i GameObjects usati qui
-      if (o.setAlpha) o.setAlpha(0);
+  private goBack(): void {
+    if (this.returnMode === "pause") {
+      this.scene.stop();
+      this.scene.resume(this.pauseMenuSceneKey);
+      this.input.keyboard?.resetKeys();
+      return;
+    }
 
-      // sposta un filo in basso per la slide-in
+    this.scene.start("Menu");
+  }
+
+  private playIntro(objs: Phaser.GameObjects.GameObject[]) {
+    for (const o of objs) {
+      if ((o as any).setAlpha) (o as any).setAlpha(0);
       if (typeof (o as any).y === "number") (o as any).y += 14;
     }
 
-    // tween unico con stagger
     this.tweens.add({
       targets: objs as any,
       alpha: 1,
@@ -223,9 +245,6 @@ export default class Options extends Phaser.Scene {
     });
   }
 
-  // ==============================
-  // PANEL PRINCIPALE con "notch"
-  // ==============================
   private drawHudPanel(cx: number, cy: number, w: number, h: number, neon: number) {
     const g = this.add.graphics();
     const x = cx - w / 2;
@@ -248,11 +267,10 @@ export default class Options extends Phaser.Scene {
     g.lineTo(x + w * 0.88, y);
     g.strokePath();
 
-
     g.lineStyle(2, neon, 0.55);
     g.beginPath();
-    g.moveTo(x, y + h * 0.20);
-    g.lineTo(x, y + h * 0.30);
+    g.moveTo(x, y + h * 0.2);
+    g.lineTo(x, y + h * 0.3);
     g.moveTo(x + w, y + h * 0.62);
     g.lineTo(x + w, y + h * 0.72);
     g.strokePath();
@@ -260,15 +278,12 @@ export default class Options extends Phaser.Scene {
     return g;
   }
 
-  // ==============================
-  // BOX HUD (header / slot)
-  // ==============================
   private drawHudBox(cx: number, cy: number, w: number, h: number, neon: number, isHeader: boolean) {
     const g = this.add.graphics();
     const x = cx - w / 2;
     const y = cy - h / 2;
 
-    g.fillStyle(0x000000, isHeader ? 0.14 : 0.10);
+    g.fillStyle(0x000000, isHeader ? 0.14 : 0.1);
     g.fillRoundedRect(x, y, w, h, 8);
 
     g.lineStyle(3, neon, 0.95);
@@ -288,12 +303,8 @@ export default class Options extends Phaser.Scene {
     return g;
   }
 
-  // ==============================
-  // SLIDER HUD (linea + knob) + HOLD-TO-DRAG SULLA LINEA
-  // ==============================
   private createHudSlider(cfg: SliderCfg): SliderOut {
     const neon = 0x70fdc2;
-
     const minX = cfg.cx - cfg.w / 2;
     const maxX = cfg.cx + cfg.w / 2;
 
@@ -311,10 +322,7 @@ export default class Options extends Phaser.Scene {
     inner.lineTo(maxX, cfg.cy + 3);
     inner.strokePath();
 
-    const knobSize = 16;
-    const knob = this.add
-      .rectangle(0, 0, knobSize, knobSize, 0x000000, 0.25)
-      .setStrokeStyle(2, neon, 1);
+    const knob = this.add.rectangle(0, 0, 16, 16, 0x000000, 0.25).setStrokeStyle(2, neon, 1);
 
     const setValueFromX = (x: number) => {
       const clamped = Phaser.Math.Clamp(x, minX, maxX);
@@ -326,11 +334,9 @@ export default class Options extends Phaser.Scene {
     setValueFromX(minX + Phaser.Math.Clamp(cfg.initial, 0, 1) * cfg.w);
     knob.y = cfg.cy;
 
-    // hit area
     const hit = this.add.rectangle(cfg.cx, cfg.cy, cfg.w + 60, 44, 0x000000, 0.001);
     hit.setInteractive({ useHandCursor: true });
 
-    // drag knob
     knob.setInteractive({ draggable: true, useHandCursor: true });
     this.input.setDraggable(knob);
     knob.on("drag", (_p: any, dragX: number) => setValueFromX(dragX));
@@ -347,7 +353,9 @@ export default class Options extends Phaser.Scene {
       setValueFromX(p.worldX);
     });
 
-    const stopHolding = () => (holding = false);
+    const stopHolding = () => {
+      holding = false;
+    };
 
     hit.on("pointerup", stopHolding);
     hit.on("pointerupoutside", stopHolding);
@@ -355,7 +363,6 @@ export default class Options extends Phaser.Scene {
       if (!this.input.activePointer.isDown) holding = false;
     });
 
-    // feedback knob
     knob.on("pointerover", () => {
       knob.setScale(1.15);
       knob.setFillStyle(0x000000, 0.35);
@@ -369,9 +376,7 @@ export default class Options extends Phaser.Scene {
     knob.on("pointerdown", () => knob.setScale(1.1));
     knob.on("pointerup", () => knob.setScale(1.15));
 
-    // container per animare tutto insieme
     const container = this.add.container(0, 0, [base, inner, hit, knob]);
-
     return { container, knob };
   }
 }

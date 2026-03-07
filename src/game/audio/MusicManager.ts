@@ -4,8 +4,14 @@ type UnlockHandlerMap = Map<string, () => void>;
 type SceneHookMap = Map<string, boolean>;
 
 export default class MusicManager {
+  private static readonly MUSIC_GAIN = 1.8;
   private static unlockHandlers = new WeakMap<Phaser.Scene, UnlockHandlerMap>();
   private static sceneHooks = new WeakMap<Phaser.Scene, SceneHookMap>();
+
+  static toEngineVolume(userVolume: number): number {
+    const normalized = Phaser.Math.Clamp(userVolume, 0, 1);
+    return normalized * this.MUSIC_GAIN;
+  }
 
   static start(
     scene: Phaser.Scene,
@@ -20,6 +26,14 @@ export default class MusicManager {
       loop: true,
       ...config,
     });
+    const soundAny = sound as any;
+
+    if (config.volume != null) {
+      soundAny.volume = config.volume;
+    }
+    if (config.loop != null) {
+      soundAny.loop = config.loop;
+    }
 
     if (scene.sound.locked) {
       this.registerUnlock(scene, key, sound);

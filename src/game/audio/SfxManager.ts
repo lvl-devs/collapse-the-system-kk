@@ -16,8 +16,16 @@ export default class SfxManager {
     const sound = scene.sound.get(key) ?? scene.sound.add(key, {
       ...config,
       volume: config.volume ?? 1,
-      loop: false
+      loop: config.loop ?? false
     });
+    const soundAny = sound as any;
+
+    if (config.volume != null) {
+      soundAny.volume = config.volume;
+    }
+    if (config.loop != null) {
+      soundAny.loop = config.loop;
+    }
 
     if (scene.sound.locked) {
       this.registerUnlock(scene, key, sound);
@@ -30,6 +38,14 @@ export default class SfxManager {
 
     this.clearUnlock(scene, key);
     return sound;
+  }
+
+  static setVolume(scene: Phaser.Scene, key: string, volume: number): void {
+    const sound = scene.sound.get(key);
+    if (!sound) {
+      return;
+    }
+    (sound as any).volume = volume;
   }
 
   static startForScene(

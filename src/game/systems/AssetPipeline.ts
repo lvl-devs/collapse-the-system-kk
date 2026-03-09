@@ -29,9 +29,7 @@ export default class AssetPipeline {
     if (GameData.images != null) {
       GameData.images.forEach((element: ImageAsset) => {
         const isCritical = CRITICAL_IMAGE_KEYS.has(element.name);
-        if (!this.shouldQueue(phase, isCritical) || scene.textures.exists(element.name)) {
-          return;
-        }
+        if (!this.shouldQueue(phase, isCritical) || scene.textures.exists(element.name)) return;
         scene.load.image(element.name, element.path);
       });
     }
@@ -71,9 +69,7 @@ export default class AssetPipeline {
     if (GameData.videos != null) {
       GameData.videos.forEach((element: VideoAsset) => {
         const isCritical = CRITICAL_VIDEO_KEYS.has(element.name);
-        if (!this.shouldQueue(phase, isCritical) || scene.cache.video.exists(element.name)) {
-          return;
-        }
+        if (!this.shouldQueue(phase, isCritical) || scene.cache.video.exists(element.name)) return;
         scene.load.video(element.name, element.path, true);
       });
     }
@@ -82,9 +78,7 @@ export default class AssetPipeline {
     if (GameData.sounds != null) {
       GameData.sounds.forEach((element: SoundAsset) => {
         const isCritical = CRITICAL_SOUND_KEYS.has(element.name);
-        if (!this.shouldQueue(phase, isCritical) || scene.cache.audio.exists(element.name)) {
-          return;
-        }
+        if (!this.shouldQueue(phase, isCritical) || scene.cache.audio.exists(element.name)) return;
         scene.load.audio(element.name, element.paths);
       });
     }

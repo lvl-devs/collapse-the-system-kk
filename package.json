@@ -19,6 +19,7 @@
     "vite": "^6.2.0"
   },
   "dependencies": {
+    "@mikewesthad/dungeon": "^2.0.1",
     "phaser": "^3.88.2"
   }
 }

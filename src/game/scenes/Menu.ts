@@ -14,6 +14,12 @@ export default class Menu extends Phaser.Scene {
 
   constructor(){ super({ key: "Menu" }); }
 
+  private playSelectSfx(): void {
+    if (localStorage.getItem("soundEffectsEnabled") === "true") {
+      this.sound.play("menuSelect");
+    }
+  }
+
   create(){
     SettingsStorage.loadVolumeSettings();
 
@@ -72,8 +78,7 @@ export default class Menu extends Phaser.Scene {
         })
 
         .on("pointerdown", () => {
-          if(localStorage.getItem("soundEffectsEnabled") === "true")
-            this.sound.play("menuSelect");
+          this.playSelectSfx();
           this.selectItem(index);
         });
       this._menuItems.push(menuItem);

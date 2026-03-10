@@ -1,18 +1,21 @@
+import Phaser from "phaser";
+
 export default class GamePlay extends Phaser.Scene {
-  private canOpenPause = true; // Simple flag to control pause menu
 
-  constructor() { super({ key: "GamePlay" }); }
+  private canOpenPause = true;
 
-  preload(){ }
+  constructor() {
+    super("GamePlay");
+  }
 
-  create(){
-    console.log("[GamePlay] create() called");
-    this.canOpenPause = true; // Reset flag on create
-    
+  create() {
+
+    this.canOpenPause = true;
+
     const { width, height } = this.scale;
 
     this.add
-      .text(width / 2, height / 2, "GAMEPLAY\nPress ESC to pause", {
+      .text(width / 2, height / 2, "GAMEPLAY\nPress ESC to pause\nPress 1-9 for MiniGames\nPress 0 for GamePlay", {
         fontFamily: "Pixelify Sans",
         fontSize: "58px",
         color: "#70fdc2",
@@ -20,42 +23,67 @@ export default class GamePlay extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    const onEscPress = () => {
-      console.log("[GamePlay] ESC pressed - canOpenPause:", this.canOpenPause);
-      
-      if (!this.canOpenPause) {
-        console.log("[GamePlay] Pause disabled, ignoring ESC");
-        return;
-      }
+    // -------- ESC (PAUSE MENU) --------
 
-      console.log("[GamePlay] Opening PauseMenu");
-      this.canOpenPause = false; // Disable until resumed
-      
-      // Use wake if scene is sleeping, otherwise launch
+    const onEscPress = () => {
+
+      if (!this.canOpenPause) return;
+
+      this.canOpenPause = false;
+
       if (this.scene.isSleeping("PauseMenu")) {
-        console.log("[GamePlay] Waking sleeping PauseMenu");
         this.scene.wake("PauseMenu", { parentSceneKey: this.scene.key });
       } else {
-        console.log("[GamePlay] Launching new PauseMenu");
         this.scene.launch("PauseMenu", { parentSceneKey: this.scene.key });
       }
+
       this.scene.pause();
     };
 
+    // -------- NUMBERS (MINIGAMES) --------
+
+    const onNumberPress = (event: KeyboardEvent) => {
+
+      const key = event.key;
+
+      if (key === "0") {
+        this.scene.start("GamePlay");
+        return;
+      }
+
+      const sceneName = `MiniGame${key}`;
+
+      if (this.scene.get(sceneName)) {
+        console.log(`[GamePlay] Opening ${sceneName}`);
+        this.scene.start(sceneName);
+      }
+    };
+
+    // -------- RESUME --------
+
     const onResume = () => {
-      console.log("[GamePlay] onResume - re-enabling pause");
-      this.canOpenPause = true; // Re-enable pause menu
+      this.canOpenPause = true;
       this.input.keyboard?.resetKeys();
     };
 
+    // -------- CONTROLLI --------
+
     this.input.keyboard?.on("keydown-ESC", onEscPress);
+    this.input.keyboard?.on("keydown", onNumberPress);
+
     this.events.on(Phaser.Scenes.Events.RESUME, onResume);
 
+    // -------- CLEANUP --------
+
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      console.log("[GamePlay] shutdown event - cleaning up");
+
       this.input.keyboard?.off("keydown-ESC", onEscPress);
+      this.input.keyboard?.off("keydown", onNumberPress);
+
       this.events.off(Phaser.Scenes.Events.RESUME, onResume);
+
     });
+
   }
 
 }

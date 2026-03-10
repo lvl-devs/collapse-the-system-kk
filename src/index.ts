@@ -8,6 +8,7 @@ import Menu from "./game/scenes/Menu";
 import GamePlay from "./game/scenes/GamePlay";
 import Options from "./game/scenes/Options";
 import PauseMenu from "./game/scenes/PauseMenu";
+import MiniGame4 from "./game/scenes/MiniGame-4";
 
 
 window.addEventListener("load", () => {
@@ -30,7 +31,9 @@ window.addEventListener("load", () => {
       Menu,
       GamePlay,
       Options,
-      PauseMenu
+      PauseMenu,
+      MiniGame4
+    
     ],
     physics: {
       default: "arcade",

@@ -16,6 +16,7 @@ export default class GamePlay extends Phaser.Scene {
   private debugMode = false;
   private tileDebugGraphics?: Phaser.GameObjects.Graphics;
   private escPauseKey?: Phaser.Input.Keyboard.Key;
+  private debugSceneKeysActiveListeners = false;
 
   constructor() {
     super({ key: "GamePlay" });
@@ -118,12 +119,30 @@ export default class GamePlay extends Phaser.Scene {
           collidingTileColor: new Phaser.Display.Color(255, 200, 0, 120),
           faceColor:          new Phaser.Display.Color(255, 255, 0, 255),
         });
+
+        // Enable minigame scene shortcuts (1-9)
+        if (!this.debugSceneKeysActiveListeners) {
+          for (let i = 1; i <= 9; i++) {
+            this.input.keyboard!.on(`keydown-${i}`, () => {
+              this.scene.start(`MiniGame-${i}`);
+            });
+          }
+          this.debugSceneKeysActiveListeners = true;
+        }
       } else {
         this.physics.world.drawDebug = false;
         this.physics.world.debugGraphic?.clear();
         this.physics.world.debugGraphic?.destroy();
         this.tileDebugGraphics?.destroy();
         this.tileDebugGraphics = undefined;
+
+        // Disable minigame scene shortcuts
+        if (this.debugSceneKeysActiveListeners) {
+          for (let i = 1; i <= 9; i++) {
+            this.input.keyboard!.off(`keydown-${i}`);
+          }
+          this.debugSceneKeysActiveListeners = false;
+        }
       }
     });
 
@@ -139,7 +158,7 @@ export default class GamePlay extends Phaser.Scene {
       .setDepth(100);
 
     this.add
-      .text(16, 48, "C -> collision debug", {
+      .text(16, 48, "C -> collision debug\n1-9 -> MiniGame (debug)", {
         fontFamily: GameData.globals.defaultFont.key,
         fontSize:   "11px",
         color:      "#666688",

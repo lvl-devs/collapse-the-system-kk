@@ -24,10 +24,12 @@ export default class Preloader extends Phaser.Scene {
       this._loadingText.setText(`Loading: ${Math.round(value * 100)}%`);
     });
     this.loadAssets();
+
   }
 
   create(){
     this._image = this.add.image(this.game.canvas.width / 2, this.game.canvas.height / 2, "bg_logo").setAlpha(0).setScale(0.25);
+    // Esempio di caricamento nel Preloader.ts
 
     this.tweens.add({
       targets: this._image,

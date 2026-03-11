@@ -4,10 +4,9 @@ export default class MiniGame1 extends Phaser.Scene {
     private code: string = '';
     private secretCode: string = '';
     private codeDisplay: Phaser.GameObjects.Text;
-    private buttons: Phaser.GameObjects.Rectangle[] = [];
+    private buttons: Phaser.GameObjects.GameObject[] = [];
     private feedbackText: Phaser.GameObjects.Text;
     private inputEnabled: boolean = true;
-    private keyboardListener: Phaser.Events.EventEmitter;
     private imageButtons: Map<number, Phaser.GameObjects.Image> = new Map();
 
     constructor() {
@@ -50,20 +49,23 @@ export default class MiniGame1 extends Phaser.Scene {
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        // Input da tastiera
-        this.keyboardListener = this.input.keyboard.on('keydown', (event: KeyboardEvent) => {
-            if (!this.inputEnabled) return;
-            const key = event.key;
-            if (key >= '0' && key <= '9') {
-                this.addDigit(key);
-            } else if (key.toLowerCase() === 'c') {
-                this.resetCode();
-            } else if (key === 'Backspace') {
-                this.removeLastDigit();
-            } else if (key === 'Enter') {
-                this.checkCode();
-            }
-        });
+        // Input da tastiera (verifica che il plugin esista)
+        const keyboard = this.input?.keyboard;
+        if (keyboard) {
+            keyboard.on('keydown', (event: KeyboardEvent) => {
+                if (!this.inputEnabled) return;
+                const key = event.key;
+                if (key >= '0' && key <= '9') {
+                    this.addDigit(key);
+                } else if (key.toLowerCase() === 'c') {
+                    this.resetCode();
+                } else if (key === 'Backspace') {
+                    this.removeLastDigit();
+                } else if (key === 'Enter') {
+                    this.checkCode();
+                }
+            });
+        }
     }
 
     private generateSecretCode(): void {
@@ -86,30 +88,14 @@ export default class MiniGame1 extends Phaser.Scene {
                 const x = startX + col * (buttonSize + spacing);
                 const y = startY + row * (buttonSize + spacing);
                 const buttonNum = row * 3 + col + 1;
-                this.createImageButton(x, y, buttonNum.toString(), buttonNum, `button_${buttonNum}`, `button_${buttonNum}_pressed`);
+                this.createImageButton(x, y, buttonNum, `button_${buttonNum}`, `button_${buttonNum}_pressed`);
             }
         }
     }
 
-    private createButton(x: number, y: number, label: string, value: number): void {
-        const size = 62;
-        const button = this.add.rectangle(x, y, size, size, 0x00dd00);
-        button.setStrokeStyle(3, 0x000000);
-        button.setInteractive({ useHandCursor: true });
-        
-        this.add.text(x, y, label, {
-            fontSize: '22px',
-            color: '#00ffff',
-            fontStyle: 'bold'
-        }).setOrigin(0.5);
+    
 
-        button.on('pointerdown', () => {
-            if (this.inputEnabled) this.addDigit(value.toString());
-        });
-        this.buttons.push(button);
-    }
-
-    private createImageButton(x: number, y: number, label: string, value: number, imageKey: string, pressedImageKey: string): void {
+    private createImageButton(x: number, y: number, value: number, imageKey: string, pressedImageKey: string): void {
         const button = this.add.image(x, y, imageKey);
         button.setScale(0.72); // leggermente più piccolo
         button.setInteractive({ useHandCursor: true });

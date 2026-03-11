@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 
-export default class MiniGame4 extends Phaser.Scene {
+export default class MiniGame3 extends Phaser.Scene {
 
     private sequence: number[] = [];
     private numbers: Phaser.GameObjects.Text[][] = [];
@@ -10,7 +10,7 @@ export default class MiniGame4 extends Phaser.Scene {
     private clickedRows: boolean[] = [];
 
     constructor() {
-        super({ key: "MiniGame4" });
+        super({ key: "MiniGame3" });
     }
 
     preload(): void {
@@ -198,7 +198,7 @@ const config: Phaser.Types.Core.GameConfig = {
     width: 800,
     height: 600,
     backgroundColor: "#000000",
-    scene: [MiniGame4]
+    scene: [MiniGame3]
 
 };
 

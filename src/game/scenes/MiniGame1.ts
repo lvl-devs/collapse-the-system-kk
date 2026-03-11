@@ -144,13 +144,13 @@ export default class MiniGame1 extends Phaser.Scene {
         const startY = 200 + 3 * (buttonSize + spacing);
 
         // C (Clear)
-        this.createImageButton(startX, startX ? startY : startY, 'C', -1, 'button_c', 'button_c_pressed');
+        this.createImageButton(startX, startY, -1, 'button_c', 'button_c_pressed');
 
         // 0
-        this.createImageButton(startX + (buttonSize + spacing), startY, '0', 0, 'button_0', 'button_0_pressed');
+        this.createImageButton(startX + (buttonSize + spacing), startY, 0, 'button_0', 'button_0_pressed');
 
         // OK
-        this.createImageButton(startX + 2 * (buttonSize + spacing), startY, 'OK', -2, 'button_ok', 'button_ok_pressed');
+        this.createImageButton(startX + 2 * (buttonSize + spacing), startY, -2, 'button_ok', 'button_ok_pressed');
     }
 
     private addDigit(digit: string): void {

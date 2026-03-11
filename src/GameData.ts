@@ -103,10 +103,11 @@ export const GameData: GameDataType = {
     defaultTheme: "cyber",
     availableThemes: ["cyber", "cave", "facility", "void"],
     defaultConfig: {
-      width: 50,
-      height: 50,
+      width: 100,
+      height: 100,
       tileSize: 32,
       doorPadding: 2,
+      roomGutter: 4,
       rooms: {
         width: { min: 7, max: 15, onlyOdd: true },
         height: { min: 7, max: 15, onlyOdd: true },
@@ -117,7 +118,7 @@ export const GameData: GameDataType = {
         stairs: {
           roomRole: "end",
         },
-        objects: [
+        /* objects: [
           {
             id: "chairs",
             tileIndex: 52,
@@ -156,7 +157,7 @@ export const GameData: GameDataType = {
             avoidOccupiedRooms: false,
             avoidOccupiedTiles: true,
           },
-        ],
+        ], */
       },
     },
   },

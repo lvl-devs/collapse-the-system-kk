@@ -15,6 +15,8 @@ export default class GamePlay extends Phaser.Scene {
   private level = 0;
   private debugMode = false;
   private tileDebugGraphics?: Phaser.GameObjects.Graphics;
+  private tileOverlayObjects: Phaser.GameObjects.GameObject[] = [];
+  private hoverInfoPanel?: Phaser.GameObjects.Text;
   private escPauseKey?: Phaser.Input.Keyboard.Key;
 
   constructor() {
@@ -139,7 +141,7 @@ export default class GamePlay extends Phaser.Scene {
       .setDepth(100);
 
     this.add
-      .text(16, 48, "C -> collision debug", {
+      .text(16, 48, "C -> collision debug  |  D -> tile indices", {
         fontFamily: GameData.globals.defaultFont.key,
         fontSize:   "11px",
         color:      "#666688",
@@ -149,9 +151,93 @@ export default class GamePlay extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(100);
 
+    // D -> tile index overlay
+    this.input.keyboard!.on("keydown-D", () => {
+      if (this.tileOverlayObjects.length > 0) {
+        this.tileOverlayObjects.forEach(o => o.destroy());
+        this.tileOverlayObjects = [];
+        this.hoverInfoPanel?.destroy();
+        this.hoverInfoPanel = undefined;
+        this.input.off("pointermove", this.onTileHover, this);
+        this.input.off("pointerdown", this.onTileCopy, this);
+        return;
+      }
+
+      const { groundLayer, stuffLayer } = this.dungeonResult;
+      const ts = groundLayer.tileset[0].tileWidth;
+
+      const tileGroupColor = (idx: number): number => {
+        if (idx === 2 || idx === 3 || idx === 4)              return 0xff6600; // top wall cap
+        if (idx === 23 || idx === 24 || idx === 25)           return 0xaaaadd; // top wall body
+        if (idx >= 42 && idx <= 46)                           return 0x2266bb; // floor
+        if (idx === 85 || idx === 86 || idx === 87)           return 0x00ffaa; // cap row angoli
+        if (idx === 105 || idx === 106 || idx === 108 || idx === 109) return 0xff44ff; // door frame top
+        if (idx === 126 || idx === 130)                       return 0x4499ff; // side walls
+        if (idx === 147 || idx === 148 || idx === 150 || idx === 151) return 0xffee00; // door frame bottom
+        if (idx === 169 || idx === 170 || idx === 171)        return 0xff3333; // bottom wall
+        if (idx === 124)                                       return 0xffaa00; // stairs
+        return 0xffffff;
+      };
+
+      const g = this.add.graphics().setDepth(59);
+      this.tileOverlayObjects.push(g);
+
+      groundLayer.forEachTile((tile) => {
+        if (tile.index < 0) return;
+        const wx = tile.pixelX;
+        const wy = tile.pixelY;
+        const color = tileGroupColor(tile.index);
+        g.fillStyle(color, 0.25);
+        g.fillRect(wx, wy, ts, ts);
+        g.lineStyle(1, color, 0.55);
+        g.strokeRect(wx, wy, ts, ts);
+        const t = this.add.text(wx + 1, wy + 1, String(tile.index), {
+          fontSize: "8px",
+          color: "#ffffff",
+          stroke: "#000000",
+          strokeThickness: 2,
+        }).setDepth(61);
+        this.tileOverlayObjects.push(t);
+      });
+
+      stuffLayer.forEachTile((tile) => {
+        if (tile.index < 0) return;
+        const wx = tile.pixelX;
+        const wy = tile.pixelY;
+        const t = this.add.text(wx + 1, wy + 11, String(tile.index), {
+          fontSize: "8px",
+          color: "#ffff44",
+          stroke: "#000000",
+          strokeThickness: 2,
+        }).setDepth(61);
+        this.tileOverlayObjects.push(t);
+      });
+
+      // Pannello hover fisso in basso a sinistra
+      this.hoverInfoPanel = this.add.text(8, this.scale.height - 8, "— hover su un tile —", {
+        fontFamily: "monospace",
+        fontSize: "12px",
+        color: "#00ffaa",
+        backgroundColor: "#000000cc",
+        padding: { x: 8, y: 4 },
+      })
+        .setScrollFactor(0)
+        .setDepth(200)
+        .setOrigin(0, 1);
+
+      this.input.on("pointermove", this.onTileHover, this);
+      this.input.on("pointerdown", this.onTileCopy, this);
+    });
+
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.escPauseKey?.off("down", this.openPauseMenu, this);
       this.escPauseKey = undefined;
+      this.tileOverlayObjects.forEach(o => o.destroy());
+      this.tileOverlayObjects = [];
+      this.hoverInfoPanel?.destroy();
+      this.hoverInfoPanel = undefined;
+      this.input.off("pointermove", this.onTileHover, this);
+      this.input.off("pointerdown", this.onTileCopy, this);
     });
 
     console.log(
@@ -165,6 +251,46 @@ export default class GamePlay extends Phaser.Scene {
     if (this.hasPlayerReachedStairs) return;
 
     this.playerController.update();
+  }
+
+  private onTileHover(pointer: Phaser.Input.Pointer): void {
+    if (!this.hoverInfoPanel) return;
+    const { groundLayer, stuffLayer } = this.dungeonResult;
+    const worldX = pointer.worldX;
+    const worldY = pointer.worldY;
+
+    const gt = groundLayer.getTileAtWorldXY(worldX, worldY);
+    const st = stuffLayer.getTileAtWorldXY(worldX, worldY);
+
+    const tileX = gt ? gt.x : Math.floor(worldX / groundLayer.tileset[0].tileWidth);
+    const tileY = gt ? gt.y : Math.floor(worldY / groundLayer.tileset[0].tileHeight);
+
+    const sIdx = st && st.index >= 0 ? String(st.index) : "—";
+
+    const cell = (dx: number, dy: number, center = false): string => {
+      const t = groundLayer.getTileAt(tileX + dx, tileY + dy);
+      const idx = t && t.index >= 0 ? String(t.index) : "·";
+      const padded = idx.padStart(3);
+      return center ? `[${padded}]` : ` ${padded} `;
+    };
+
+    this.hoverInfoPanel.setText([
+      `grid (${tileX}, ${tileY})   stuff: [${sIdx}]`,
+      `${cell(-1,-1)} ${cell(0,-1)} ${cell(1,-1)}`,
+      `${cell(-1, 0)} ${cell(0, 0, true)} ${cell(1, 0)}`,
+      `${cell(-1, 1)} ${cell(0, 1)} ${cell(1, 1)}`,
+    ].join("\n"));
+  }
+
+  private onTileCopy(): void {
+    if (!this.hoverInfoPanel) return;
+    const text = this.hoverInfoPanel.text;
+    navigator.clipboard?.writeText(text).catch(() => {});
+    const prev = this.hoverInfoPanel.style.color;
+    this.hoverInfoPanel.setColor("#ffffff").setBackgroundColor("#007700cc");
+    this.time.delayedCall(600, () => {
+      this.hoverInfoPanel?.setColor(prev).setBackgroundColor("#000000cc");
+    });
   }
 
   private openPauseMenu(): void {

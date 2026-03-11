@@ -30,6 +30,7 @@ export interface DungeonConfig {
   theme: DungeonThemeKey;
   seed?: string;
   doorPadding?: number;
+  roomGutter?: number;
   rooms: {
     width:  { min: number; max: number; onlyOdd?: boolean };
     height: { min: number; max: number; onlyOdd?: boolean };
@@ -109,13 +110,14 @@ export class DungeonGenerator {
       height: config.height,
       randomSeed: config.seed,
       doorPadding: config.doorPadding ?? 2,
+      roomGutter: config.roomGutter ?? 0,
       rooms: {
         width: { min: config.rooms.width.min, max: config.rooms.width.max, onlyOdd: config.rooms.width.onlyOdd ?? true },
         height: { min: config.rooms.height.min, max: config.rooms.height.max, onlyOdd: config.rooms.height.onlyOdd ?? true },
         maxArea: config.rooms.maxArea,
         maxRooms: config.rooms.maxRooms,
       },
-    });
+    } as any);
 
     // Choose tileset texture: prefer loaded image, fallback to canvas
     const tilesetKey = theme.tilesetKey;
@@ -149,24 +151,44 @@ export class DungeonGenerator {
     // Fill background with blank wall tiles
     groundLayer.fill(TILES.BLANK);
 
-    // Paint rooms
+    // Pass 1: Paint floors and walls for ALL rooms before placing any doors.
+    // This ensures no room's wall painting can overwrite another room's door tiles.
     dungeon.rooms.forEach((room) => {
       const { x, y, width, height, left, right, top, bottom } = room;
 
-      groundLayer.weightedRandomize(TILES.FLOOR, x + 1, y + 1, width - 2, height - 2);
+      // Floor: interior starts 2 rows below top (top wall is 2 rows tall)
+      groundLayer.weightedRandomize(TILES.FLOOR, x + 1, y + 2, width - 2, height - 3);
 
-      groundLayer.weightedRandomize(TILES.WALL.TOP,    left + 1, top,    width - 2, 1);
+      // Top wall - riga 1 (cap arancione)
+      groundLayer.weightedRandomize(TILES.WALL.TOP,      left + 1, top,     width - 2, 1);
+      // Propaga tile 4 a destra del primo tile 3: [2...2, 3, 4...4]
+      let fillTop = false;
+      for (let cx = left + 1; cx <= right - 1; cx++) {
+        const t = groundLayer.getTileAt(cx, top);
+        if (fillTop) { groundLayer.putTileAt(4, cx, top); }
+        else if (t && t.index === 3) { fillTop = true; }
+      }
+      // Top wall - riga 2 (corpo grigio)
+      groundLayer.weightedRandomize(TILES.WALL.TOP_BODY, left + 1, top + 1, width - 2, 1);
+      // Bottom wall
       groundLayer.weightedRandomize(TILES.WALL.BOTTOM, left + 1, bottom, width - 2, 1);
-      groundLayer.weightedRandomize(TILES.WALL.LEFT,   left,  top + 1, 1, height - 2);
-      groundLayer.weightedRandomize(TILES.WALL.RIGHT,  right, top + 1, 1, height - 2);
+      // Side walls (from riga 2 of top down to bottom-1)
+      groundLayer.weightedRandomize(TILES.WALL.LEFT,   left,  top + 2, 1, height - 3);
+      groundLayer.weightedRandomize(TILES.WALL.RIGHT,  right, top + 2, 1, height - 3);
+    });
 
-      // Place doors
+    // Pass 2a: Place ALL doors and mark blocked tiles across every room.
+    // Must run completely before Pass 2b so that adjacency checks see all doors.
+    dungeon.rooms.forEach((room) => {
+      const { x, y, width, height } = room;
+
       const doors = room.getDoorLocations();
       for (const door of doors) {
         if (door.y === 0) {
           const startX = x + door.x - 1;
           const doorY = y + door.y;
-          groundLayer.putTilesAt(TILES.DOOR.TOP, startX, doorY);
+          groundLayer.putTilesAt(TILES.DOOR.TOP,      startX, doorY);
+          groundLayer.putTilesAt(TILES.DOOR.TOP_BODY, startX, doorY + 1);
 
           for (let i = 0; i < TILES.DOOR.TOP.length; i++) {
             markBlocked(startX + i, doorY);
@@ -175,7 +197,8 @@ export class DungeonGenerator {
         } else if (door.y === height - 1) {
           const startX = x + door.x - 1;
           const doorY = y + door.y;
-          groundLayer.putTilesAt(TILES.DOOR.BOTTOM, startX, doorY);
+          groundLayer.putTilesAt(TILES.DOOR.BOTTOM,      startX, doorY);
+          groundLayer.putTilesAt(TILES.DOOR.BOTTOM_BODY, startX, doorY - 1);
 
           for (let i = 0; i < TILES.DOOR.BOTTOM.length; i++) {
             markBlocked(startX + i, doorY);
@@ -201,13 +224,133 @@ export class DungeonGenerator {
           }
         }
       }
-
-      // Corners applied last so walls/doors can never overwrite them
-      groundLayer.putTileAt(TILES.WALL.TOP_LEFT,     left,  top);
-      groundLayer.putTileAt(TILES.WALL.TOP_RIGHT,    right, top);
-      groundLayer.putTileAt(TILES.WALL.BOTTOM_RIGHT, right, bottom);
-      groundLayer.putTileAt(TILES.WALL.BOTTOM_LEFT,  left,  bottom);
     });
+
+    // Pass 2b: Place corners and cap rows now that ALL door positions are known.
+    dungeon.rooms.forEach((room) => {
+      const { left, right, top, bottom } = room;
+
+      // Corners
+      groundLayer.putTileAt(TILES.WALL.TOP_LEFT,  left,  top);
+      groundLayer.putTileAt(TILES.WALL.TOP_RIGHT, right, top);
+      // Top body corners: se il vicino esterno è una door tile, usa DOOR.LEFT/RIGHT top post (106/108)
+      const topLeftBodyTile  = blockedDoorTiles.has(`${left  - 1},${top + 1}`) ? TILES.DOOR.LEFT[0][0]  : TILES.WALL.TOP_LEFT_BODY;
+      const topRightBodyTile = blockedDoorTiles.has(`${right + 1},${top + 1}`) ? TILES.DOOR.RIGHT[0][0] : TILES.WALL.TOP_RIGHT_BODY;
+      groundLayer.putTileAt(topLeftBodyTile,  left,  top + 1);
+      groundLayer.putTileAt(topRightBodyTile, right, top + 1);
+      // Bottom corners: se il vicino esterno è una door tile, usa WALL.BOTTOM plain;
+      // se il vicino interno (left+1) è una door tile, usa tile 70 e sovrascrive il door con 71
+      const bottomRightTile = blockedDoorTiles.has(`${right + 1},${bottom}`) ? TILES.WALL.BOTTOM[0].index as number
+                            : blockedDoorTiles.has(`${right - 1},${bottom}`) ? 73
+                            : TILES.WALL.BOTTOM_RIGHT;
+      const bottomLeftTile  = blockedDoorTiles.has(`${left  - 1},${bottom}`) ? TILES.WALL.BOTTOM[0].index as number
+                            : blockedDoorTiles.has(`${left  + 1},${bottom}`) ? 70
+                            : TILES.WALL.BOTTOM_LEFT;
+      groundLayer.putTileAt(bottomRightTile, right, bottom);
+      groundLayer.putTileAt(bottomLeftTile,  left,  bottom);
+      // Se il corner è diventato 70 (door interna a left+1), rimpiazzare anche quel door con 71
+      if (bottomLeftTile === 70) {
+        groundLayer.putTileAt(71, left + 1, bottom);
+      }
+      // Se il corner è diventato 73 e right,bottom-1 è stato sporcato dal BOTTOM_BODY
+      // (porta sul bordo inferiore con ultimo tile a x=right), ripristinare la parete destra.
+      // Guard: se right,bottom-2 NON è bloccato, il 42 a right,bottom-1 è spillover di BOTTOM_BODY
+      // (non un'apertura di porta RIGHT che coprirebbe anche bottom-2).
+      if (bottomRightTile === 73 && !blockedDoorTiles.has(`${right},${bottom - 2}`)) {
+        groundLayer.putTileAt(TILES.WALL.RIGHT[0].index as number, right, bottom - 1);
+      }
+
+      // Cap/shadow row above top wall (solo pixel r22-31 visibili, crea profondità)
+      const capY = top - 1;
+      if (capY >= 0) {
+        for (let cx = left; cx <= right; cx++) {
+          const existing = groundLayer.getTileAt(cx, capY);
+          // Non sovrascrivere tile di altre stanze già piazzati
+          if (existing && existing.index !== TILES.BLANK) continue;
+
+          if (cx === left) {
+            groundLayer.putTileAt(TILES.TOP_CAP.LEFT_CORNER, cx, capY);
+          } else if (cx === right) {
+            groundLayer.putTileAt(TILES.TOP_CAP.RIGHT_CORNER, cx, capY);
+          } else {
+            groundLayer.weightedRandomize(TILES.TOP_CAP.CENTER, cx, capY, 1, 1);
+          }
+        }
+      }
+    });
+
+    // Draw corridors in gutter gaps between rooms
+    const roomGutter = config.roomGutter ?? 0;
+    if (roomGutter > 0) {
+      const leftWallIdx  = TILES.WALL.LEFT[0].index as number;
+      const rightWallIdx = TILES.WALL.RIGHT[0].index as number;
+      const topBodyIdx   = TILES.WALL.TOP_BODY[0].index as number;
+      const bottomIdx    = TILES.WALL.BOTTOM[0].index as number;
+
+      // Place a tile only if the target cell is currently blank (don't overwrite room walls/floors)
+      const putIfBlank = (tx: number, ty: number, tile: number): void => {
+        if (tx < 0 || ty < 0 || tx >= dungeon.width || ty >= dungeon.height) return;
+        const existing = groundLayer.getTileAt(tx, ty);
+        if (existing && existing.index !== TILES.BLANK) return;
+        groundLayer.putTileAt(tile, tx, ty);
+      };
+      const putWallIfBlank = putIfBlank;
+
+      dungeon.rooms.forEach((room) => {
+        const doors = room.getDoorLocations();
+        for (const door of doors) {
+          const absX = room.x + door.x;
+          const absY = room.y + door.y;
+          if (door.y === 0) {
+            // TOP door: corridoio verso l'alto — il door è largo 4 [FRAME,42,42,FRAME]
+            // floor a absX e absX+1, pareti a absX-1 e absX+2
+            for (let dy = 1; dy <= roomGutter; dy++) {
+              const ty = absY - dy;
+              if (ty >= 0) {
+                putIfBlank(absX,     ty, TILES.FLOOR[0].index as number);
+                putIfBlank(absX + 1, ty, TILES.FLOOR[0].index as number);
+                putWallIfBlank(absX - 1, ty, leftWallIdx);
+                putWallIfBlank(absX + 2, ty, rightWallIdx);
+              }
+            }
+          } else if (door.y === room.height - 1) {
+            // BOTTOM door: corridoio verso il basso — stesso schema
+            for (let dy = 1; dy <= roomGutter; dy++) {
+              const ty = absY + dy;
+              if (ty < dungeon.height) {
+                putIfBlank(absX,     ty, TILES.FLOOR[0].index as number);
+                putIfBlank(absX + 1, ty, TILES.FLOOR[0].index as number);
+                putWallIfBlank(absX - 1, ty, leftWallIdx);
+                putWallIfBlank(absX + 2, ty, rightWallIdx);
+              }
+            }
+          } else if (door.x === 0) {
+            // LEFT door: corridoio verso sinistra — il door è alto 4 [FRAME,42,42,FRAME]
+            // floor a absY e absY+1, pareti a absY-1 e absY+2
+            for (let dx = 1; dx <= roomGutter; dx++) {
+              const tx = absX - dx;
+              if (tx >= 0) {
+                putIfBlank(tx, absY,     TILES.FLOOR[0].index as number);
+                putIfBlank(tx, absY + 1, TILES.FLOOR[0].index as number);
+                putWallIfBlank(tx, absY - 1, topBodyIdx);
+                putWallIfBlank(tx, absY + 2, bottomIdx);
+              }
+            }
+          } else if (door.x === room.width - 1) {
+            // RIGHT door: corridoio verso destra — stesso schema
+            for (let dx = 1; dx <= roomGutter; dx++) {
+              const tx = absX + dx;
+              if (tx < dungeon.width) {
+                putIfBlank(tx, absY,     TILES.FLOOR[0].index as number);
+                putIfBlank(tx, absY + 1, TILES.FLOOR[0].index as number);
+                putWallIfBlank(tx, absY - 1, topBodyIdx);
+                putWallIfBlank(tx, absY + 2, bottomIdx);
+              }
+            }
+          }
+        }
+      });
+    }
 
     // Setup collisions
     groundLayer.setCollisionByExclusion([-1, ...TILES.FLOOR_INDICES]);
@@ -239,13 +382,7 @@ export class DungeonGenerator {
     occupiedTiles.add(tileKey(stairsRoom.centerX, stairsRoom.centerY));
 
     // Configurable object placement with defaults equivalent to previous chest behavior.
-    const objectRules = config.placement?.objects ?? [{
-      id: "chest",
-      tileIndex: TILES.CHEST,
-      roomRoles: ["other"] as DungeonRoomRole[],
-      chancePerRoom: 0.3,
-      avoidOccupiedRooms: true,
-    }];
+    const objectRules = config.placement?.objects ?? [];
 
     for (const rule of objectRules) {
       const roles = rule.roomRoles && rule.roomRoles.length > 0 ? rule.roomRoles : (["other"] as DungeonRoomRole[]);
@@ -396,7 +533,8 @@ export class DungeonGenerator {
     const wallPadding = Math.max(1, Math.floor(position.paddingFromWalls));
     let minX = room.x + wallPadding;
     let maxX = room.x + room.width - 1 - wallPadding;
-    let minY = room.y + wallPadding;
+    // Top wall is 2 rows tall, so floor starts at room.y+2 minimum
+    let minY = room.y + Math.max(wallPadding, 2);
     let maxY = room.y + room.height - 1 - wallPadding;
 
     // Fallback for very small rooms: use full interior area.

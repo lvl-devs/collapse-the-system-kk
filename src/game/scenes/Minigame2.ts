@@ -71,6 +71,8 @@ export default class Minigame2 extends Phaser.Scene {
     this.load.image("mg2_folder2", "../assets/images/min2/Folder2.png");
     this.load.image("mg2_granted", "../assets/images/min2/Access_granted.png");
 
+    this.load.image("mg2_display", "../assets/images/min2/Display.png");
+
     this.load.spritesheet("mg2_buttons", "../assets/images/min2/Buttons.png", {
       frameWidth: 42,
       frameHeight: 42
@@ -172,10 +174,9 @@ this.folderRight = this.add
   }
 
   private createProgressBar(cx: number, cy: number, mw: number) {
-
-  const barY = cy + this.s(26);   // un po più vicina al centro
-  const barW = mw * 0.48;         // barra più corta
-  const barH = this.s(9);         // barra più bassa
+  const barY = cy + this.s(30);
+  const barW = mw * 0.38;
+  const barH = this.s(8);
 
   const outer = this.add
     .rectangle(cx, barY, barW + this.s(4), barH + this.s(4), 0x0d1320, 1)
@@ -187,14 +188,14 @@ this.folderRight = this.add
     .setDepth(3);
 
   this.progressFill = this.add
-    .rectangle(cx - barW / 2, barY, 0, barH - this.s(1.5), 0x72ef74, 1)
+    .rectangle(cx - barW / 2, barY, 0, barH - this.s(2), 0x72ef74, 1)
     .setOrigin(0, 0.5)
     .setDepth(4);
 
   this.progressText = this.add
-    .text(cx + barW / 2 + this.s(12), barY, "0%", {
+    .text(cx + barW / 2 + this.s(18), barY, "0%", {
       fontFamily: "Pixelify Sans",
-      fontSize: `${Math.max(10, Math.round(this.s(9)))}px`,
+      fontSize: `${Math.max(10, Math.round(this.s(6)))}px`,
       color: "#f2f4f9",
       fontStyle: "bold"
     })
@@ -203,21 +204,19 @@ this.folderRight = this.add
 
   this.progressSegments = [];
 
-  const segCount = 18;                 // meno segmenti
+  const segCount = 16;
   const segGap = this.s(1.2);
-  const usableW = barW - this.s(4);
-
+  const usableW = barW - this.s(6);
   const segW = (usableW - segGap * (segCount - 1)) / segCount;
   const startX = cx - usableW / 2 + segW / 2;
 
   for (let i = 0; i < segCount; i++) {
-
     const seg = this.add
       .rectangle(
         startX + i * (segW + segGap),
         barY,
         segW,
-        barH - this.s(2),
+        barH - this.s(2.5),
         0x1b2634,
         0.95
       )
@@ -482,30 +481,30 @@ private createSequenceRow(cx: number, cy: number) {
   }
 
   private updateProgressUI() {
-    const maxWidth = this.s(this.MONITOR_W) * 0.56;
-    const targetWidth = (this.progress / 100) * maxWidth;
+  const maxWidth = this.s(this.MONITOR_W) * 0.38;
+  const targetWidth = (this.progress / 100) * maxWidth;
 
-    this.tweens.add({
-      targets: this.progressFill,
-      width: targetWidth,
-      duration: 160,
-      ease: "Sine.Out"
-    });
+  this.tweens.add({
+    targets: this.progressFill,
+    width: targetWidth,
+    duration: 160,
+    ease: "Sine.Out"
+  });
 
-    this.progressText.setText(`${Math.round(this.progress)}%`);
+  this.progressText.setText(`${Math.round(this.progress)}%`);
 
-    const filledSegments = Math.round(
-      (this.progress / 100) * this.progressSegments.length
-    );
+  const filledSegments = Math.round(
+    (this.progress / 100) * this.progressSegments.length
+  );
 
-    for (let i = 0; i < this.progressSegments.length; i++) {
-      if (i < filledSegments) {
-        this.progressSegments[i].setFillStyle(0x72ef74, 1);
-      } else {
-        this.progressSegments[i].setFillStyle(0x1b2634, 0.95);
-      }
+  for (let i = 0; i < this.progressSegments.length; i++) {
+    if (i < filledSegments) {
+      this.progressSegments[i].setFillStyle(0x72ef74, 1);
+    } else {
+      this.progressSegments[i].setFillStyle(0x1b2634, 0.95);
     }
   }
+}
 
   private showStatus(message: string) {
     this.statusText.setText(message);
@@ -521,50 +520,51 @@ private createSequenceRow(cx: number, cy: number) {
   }
 
   private completeTask() {
-    this.acceptingInput = false;
-    this.input.keyboard?.off("keydown", this.handleKeyPress, this);
 
-    if (this.alertImage) {
-      this.alertImage.destroy();
-      this.alertImage = undefined;
-    }
+  this.acceptingInput = false;
+  this.input.keyboard?.off("keydown", this.handleKeyPress, this);
 
-    const cx = this.ax(this.MONITOR_CX);
-    const cy = this.ay(this.MONITOR_CY);
-    const mw = this.s(this.MONITOR_W);
-    const mh = this.s(this.MONITOR_H);
-
-    this.registry.set("task2Completed", true);
-
-    const blackScreen = this.add
-      .rectangle(cx, cy, mw, mh, 0x000000, 1)
-      .setDepth(20)
-      .setAlpha(0);
-
-    const granted = this.add
-      .image(cx, cy + this.s(8), "mg2_granted")
-      .setScale(this.s(0.78))
-      .setDepth(21)
-      .setAlpha(0);
-
-    this.tweens.add({
-      targets: blackScreen,
-      alpha: 1,
-      duration: 250,
-      ease: "Sine.Out"
-    });
-
-    this.tweens.add({
-      targets: granted,
-      alpha: 1,
-      duration: 300,
-      delay: 200,
-      ease: "Sine.Out"
-    });
-
-    this.time.delayedCall(2200, () => {
-      this.scene.stop();
-      this.scene.resume("GamePlay");
-    });
+  if (this.alertImage) {
+    this.alertImage.destroy();
+    this.alertImage = undefined;
   }
+
+  const cx = this.ax(this.MONITOR_CX);
+  const cy = this.ay(this.MONITOR_CY);
+
+  this.registry.set("task2Completed", true);
+
+  // schermo nero del monitor
+  const display = this.add
+    .image(cx, cy + this.s(12), "mg2_display")
+    .setScale(this.s(0.95))
+    .setDepth(20)
+    .setAlpha(0);
+
+  const granted = this.add
+    .image(cx, cy + this.s(10), "mg2_granted")
+    .setScale(this.s(0.8))
+    .setDepth(21)
+    .setAlpha(0);
+
+  this.tweens.add({
+    targets: display,
+    alpha: 1,
+    duration: 200,
+    ease: "Sine.Out"
+  });
+
+  this.tweens.add({
+    targets: granted,
+    alpha: 1,
+    duration: 300,
+    delay: 150,
+    ease: "Sine.Out"
+  });
+
+  this.time.delayedCall(2200, () => {
+    this.scene.stop();
+    this.scene.resume("GamePlay");
+  });
+}
 }

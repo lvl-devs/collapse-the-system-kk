@@ -3,6 +3,7 @@ import GameData from "../../GameData";
 import AssetPipeline from "../systems/AssetPipeline";
 import MusicManager from "../audio/MusicManager";
 import SfxManager from "../audio/SfxManager";
+import LevelStorage from "../systems/LevelStorage";
 import SettingsStorage from "../systems/SettingsStorage";
 
 export default class Menu extends Phaser.Scene {
@@ -134,6 +135,7 @@ export default class Menu extends Phaser.Scene {
     const item = GameData.menu.items[index];
     console.log("[Menu] selectItem - starting scene:", item.scene);
     if (item.scene === "GamePlay") {
+      LevelStorage.resetToFirstLevel();
       MusicManager.stop(this, Menu.MENU_MUSIC_KEY);
       SfxManager.stop(this, Menu.RAIN_SFX_KEY);
       this.scene.stop("MenuBackdrop");

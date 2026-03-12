@@ -3,21 +3,28 @@ import { GameData } from "../../GameData";
 import DungeonGenerator from "../systems/DungeonGenerator";
 import type { DungeonBuildResult } from "../systems/DungeonGenerator";
 import AssetPipeline from "../systems/AssetPipeline";
+import MusicManager from "../audio/MusicManager";
+import LevelStorage from "../systems/LevelStorage";
 import { DEFAULT_TILES } from "../systems/TileMapping";
 import CharacterController, { createKeyboardMovementInput } from "../entities/CharacterController";
 
 const PLAYER_SPEED = 160;
 
 export default class GamePlay extends Phaser.Scene {
+  private static readonly LEVEL_MUSIC_BY_LEVEL: Record<number, string> = {
+    1: "level-1-theme",
+  };
+
   private dungeonResult!: DungeonBuildResult;
   private playerController!: CharacterController;
   private hasPlayerReachedStairs = false;
-  private level = 0;
+  private currentLevel = 1;
   private debugMode = false;
   private tileDebugGraphics?: Phaser.GameObjects.Graphics;
   private tileOverlayObjects: Phaser.GameObjects.GameObject[] = [];
   private hoverInfoPanel?: Phaser.GameObjects.Text;
   private escPauseKey?: Phaser.Input.Keyboard.Key;
+  private currentLevelMusicKey?: string;
 
   constructor() {
     super({ key: "GamePlay" });
@@ -28,8 +35,12 @@ export default class GamePlay extends Phaser.Scene {
   }
 
   create() {
-    this.level++;
+    this.currentLevel = LevelStorage.getCurrentLevel();
     this.hasPlayerReachedStairs = false;
+    this.startLevelMusic(this.currentLevel);
+
+    this.events.on(Phaser.Scenes.Events.PAUSE, this.stopCurrentLevelMusic, this);
+    this.events.on(Phaser.Scenes.Events.RESUME, this.resumeCurrentLevelMusic, this);
 
     const cfg = GameData.dungeon.defaultConfig;
     this.dungeonResult = DungeonGenerator.buildTilemap(this, {
@@ -130,7 +141,7 @@ export default class GamePlay extends Phaser.Scene {
     });
 
     this.add
-      .text(16, 16, `Level: ${this.level}\nESC -> Menu`, {
+      .text(16, 16, `Level: ${this.currentLevel}\nESC -> Menu`, {
         fontFamily: GameData.globals.defaultFont.key,
         fontSize:   "14px",
         color:      "#aaaacc",
@@ -230,6 +241,8 @@ export default class GamePlay extends Phaser.Scene {
     });
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.events.off(Phaser.Scenes.Events.PAUSE, this.stopCurrentLevelMusic, this);
+      this.events.off(Phaser.Scenes.Events.RESUME, this.resumeCurrentLevelMusic, this);
       this.escPauseKey?.off("down", this.openPauseMenu, this);
       this.escPauseKey = undefined;
       this.tileOverlayObjects.forEach(o => o.destroy());
@@ -241,7 +254,7 @@ export default class GamePlay extends Phaser.Scene {
     });
 
     console.log(
-      `[GamePlay] Level ${this.level} -- ${map.width}x${map.height} tiles` +
+      `[GamePlay] Level ${this.currentLevel} -- ${map.width}x${map.height} tiles` +
       ` -- ${this.dungeonResult.dungeon.rooms.length} rooms` +
       ` -- theme: ${GameData.dungeon.defaultTheme}`
     );
@@ -298,7 +311,43 @@ export default class GamePlay extends Phaser.Scene {
     if (this.scene.isActive("PauseMenu")) {
       return;
     }
+    this.stopCurrentLevelMusic();
     this.scene.launch("PauseMenu", { parentSceneKey: this.scene.key });
     this.scene.pause();
+  }
+
+  private startLevelMusic(level: number): void {
+    const fallbackLevel = 1;
+    const musicKey = GamePlay.LEVEL_MUSIC_BY_LEVEL[level] ?? GamePlay.LEVEL_MUSIC_BY_LEVEL[fallbackLevel];
+    if (!musicKey) {
+      this.currentLevelMusicKey = undefined;
+      return;
+    }
+
+    this.currentLevelMusicKey = musicKey;
+
+    MusicManager.startForScene(this, musicKey, {
+      loop: true,
+      volume: MusicManager.toEngineVolume(GameData.musicVolume ?? 0.6),
+    });
+  }
+
+  private stopCurrentLevelMusic(): void {
+    if (!this.currentLevelMusicKey) {
+      return;
+    }
+    MusicManager.stop(this, this.currentLevelMusicKey);
+  }
+
+  private resumeCurrentLevelMusic(): void {
+    if (!this.currentLevelMusicKey) {
+      this.startLevelMusic(this.currentLevel);
+      return;
+    }
+
+    MusicManager.startForScene(this, this.currentLevelMusicKey, {
+      loop: true,
+      volume: MusicManager.toEngineVolume(GameData.musicVolume ?? 0.6),
+    });
   }
 }

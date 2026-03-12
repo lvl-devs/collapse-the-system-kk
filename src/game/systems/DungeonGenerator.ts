@@ -229,8 +229,6 @@ export class DungeonGenerator {
         const below     = groundLayer.getTileAt(tx,     ty + 1);
         const left      = groundLayer.getTileAt(tx - 1, ty);
         const right     = groundLayer.getTileAt(tx + 1, ty);
-        const aboveLeft  = groundLayer.getTileAt(tx - 1, ty - 1);
-        const aboveRight = groundLayer.getTileAt(tx + 1, ty - 1);
         const belowLeft  = groundLayer.getTileAt(tx - 1, ty + 1);
         const belowRight = groundLayer.getTileAt(tx + 1, ty + 1);
 
@@ -238,8 +236,6 @@ export class DungeonGenerator {
         const ri = right?.index ?? -1;
         const ai = above?.index ?? -1;
         const bi = below?.index ?? -1;
-        const ali = aboveLeft?.index  ?? -1;
-        const ari = aboveRight?.index ?? -1;
         const bli = belowLeft?.index  ?? -1;
         const bri = belowRight?.index ?? -1;
 

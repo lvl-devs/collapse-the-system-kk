@@ -12,6 +12,8 @@ import PauseMenu from "./game/scenes/PauseMenu";
 import Minigame1 from "./game/scenes/Minigame1";
 import Minigame2 from "./game/scenes/Minigame2";
 import Minigame3 from "./game/scenes/Minigame3";
+import Minigame4 from "./game/scenes/Minigame4";
+import Minigame7 from "./game/scenes/Minigame7";
 
 window.addEventListener("load", () => {
   const config: Phaser.Types.Core.GameConfig = {
@@ -38,6 +40,8 @@ window.addEventListener("load", () => {
       Minigame1,
       Minigame2,
       Minigame3,
+      Minigame4,
+      Minigame7,
     ],
     physics: {
       default: "arcade",

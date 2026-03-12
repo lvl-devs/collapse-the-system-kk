@@ -35,20 +35,18 @@ type SocketData = {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const WIRE_COLORS: WireColor[] = [
-  { name: "cyan",      hex: 0x00eeff },
-  { name: "green",     hex: 0x00ff44 },
-  { name: "yellow",    hex: 0xffe600 },
-  { name: "pink",      hex: 0xff00aa },
-  { name: "orange",    hex: 0xff6600 },
-  { name: "blue",      hex: 0x4488ff },
-  { name: "lime",      hex: 0xaaff00 },
-  { name: "red",       hex: 0xff2222 },
-  { name: "purple",    hex: 0xaa00ff },
-  { name: "white",     hex: 0xeeeeff },
+  { name: "cyan",   hex: 0x00eeff },
+  { name: "green",  hex: 0x00ff44 },
+  { name: "yellow", hex: 0xffe600 },
+  { name: "pink",   hex: 0xff00aa },
+  { name: "orange", hex: 0xff6600 },
+  { name: "blue",   hex: 0x4488ff },
+  { name: "lime",   hex: 0xaaff00 },
+  { name: "white",  hex: 0xeeeeff },
 ];
 
 const GRAY_COLOR: WireColor = { name: "gray", hex: 0x6c7687 };
-const SOCKET_COUNT = 5; // per side — 4 sides × 5 = 20 sockets, 10 color pairs
+const SOCKET_COUNT = 4; 
 const TABLET_RATIO = 1.68;
 
 // Bezier handle offsets
@@ -166,12 +164,11 @@ export default class Minigame1 extends Phaser.Scene {
       .text(
         this.screenX,
         hintY,
-        "RESTORE THE CIRCUIT BY MATCHING COLORS - CONNECT DIAGONALLY TOO",
+        "RESTORE THE CIRCUIT BY MATCHING COLORS",
         {
           fontFamily: "Pixelify Sans",
-          fontSize: `${Math.max(12, Math.round(this.s(16)))}px`,
+          fontSize: `${Math.max(22, Math.round(this.s(16)))}px`,
           color: "#bafcff",
-          fontStyle: "bold",
           align: "center",
         }
       )
@@ -179,8 +176,8 @@ export default class Minigame1 extends Phaser.Scene {
       .setAlpha(0);
 
     const targets = [hintBg, hintText];
-    this.tweens.add({ targets, alpha: 1, duration: 250, ease: "Sine.Out" });
-    this.tweens.add({ targets, alpha: 0, duration: 500, delay: 1900, ease: "Sine.In" });
+    this.tweens.add({ targets, alpha: 1, duration: 1250, ease: "Sine.Out" });
+    this.tweens.add({ targets, alpha: 0, duration: 1500, delay: 1900, ease: "Sine.In" });
   }
 
   private createAlerts() {
@@ -244,25 +241,37 @@ export default class Minigame1 extends Phaser.Scene {
 
   private createSocketsAndWires() {
     // Layout anchors
-    const leftX   = this.screenX - this.screenW / 2 + this.screenW * 0.12;
-    const rightX  = this.screenX + this.screenW / 2 - this.screenW * 0.12;
-    const topY    = this.screenY - this.screenH / 2 + this.screenH * 0.12;
-    const bottomY = this.screenY + this.screenH / 2 - this.screenH * 0.12;
+    const leftX   = this.screenX - this.screenW / 2 + this.screenW * 0.15;
+    const rightX  = this.screenX + this.screenW / 2 - this.screenW * 0.15;
+    const topY    = this.screenY - this.screenH / 2 + this.screenH * 0.20;
+    const bottomY = this.screenY + this.screenH / 2 - this.screenH * 0.11;
 
-    const vPos = this.linspace(this.screenY - this.screenH * 0.28, this.screenH * 0.14, SOCKET_COUNT);
-    const hPos = this.linspace(this.screenX - this.screenW * 0.28, this.screenW * 0.14, SOCKET_COUNT);
+    const offsetY = this.screenH * 0.03;
+    const vPos = [
+  this.screenY - this.screenH * 0.22 + offsetY,
+  this.screenY - this.screenH * 0.07 + offsetY,
+  this.screenY + this.screenH * 0.07 + offsetY,
+  this.screenY + this.screenH * 0.22 + offsetY
+];
+
+const hPos = [
+  this.screenX - this.screenW * 0.16,
+  this.screenX - this.screenW * 0.05,
+  this.screenX + this.screenW * 0.05,
+  this.screenX + this.screenW * 0.16
+];
 
     const colors = Phaser.Utils.Array.Shuffle([...WIRE_COLORS]) as WireColor[];
-    const groupA = colors.slice(0, 5); // left ↔ right
-    const groupB = colors.slice(5, 10); // top  ↔ bottom
+    const groupA = colors.slice(0, 4); // left ↔ right
+    const groupB = colors.slice(4, 8); // top  ↔ bottom
 
-    // 50% of destination sockets are revealed → 5 revealed, 5 hidden
+    // 50% of destination sockets are revealed → 4 revealed, 4 hidden
     const revealMask = Phaser.Utils.Array.Shuffle([
-      ...Array(5).fill(true),
-      ...Array(5).fill(false),
+      ...Array(4).fill(true),
+      ...Array(4).fill(false),
     ]) as boolean[];
 
-    const slots = () => Phaser.Utils.Array.Shuffle([0, 1, 2, 3, 4]) as number[];
+    const slots = () => Phaser.Utils.Array.Shuffle([0, 1, 2, 3]) as number[];
     const leftSlots   = slots();
     const rightSlots  = slots();
     const topSlots    = slots();
@@ -281,7 +290,7 @@ export default class Minigame1 extends Phaser.Scene {
     for (let i = 0; i < groupB.length; i++) {
       const color = groupB[i];
       const sA = this.createSocket(hPos[topSlots[i]],    topY,    color, "top",    true);
-      const sB = this.createSocket(hPos[bottomSlots[i]], bottomY, color, "bottom", revealMask[i + 5]);
+      const sB = this.createSocket(hPos[bottomSlots[i]], bottomY, color, "bottom", revealMask[i + 4]);
       this.sockets.push(sA, sB);
       this.createWire(color, sA, sB);
     }
@@ -304,7 +313,7 @@ export default class Minigame1 extends Phaser.Scene {
     const plug = this.add.container(socketA.x, socketA.y);
     const plugGfx = this.add.graphics();
     plug.add(plugGfx);
-    this.drawPlugGraphic(plugGfx, color.hex, socketA.side, true);
+    this.drawPlugGraphic(plugGfx, color.hex, socketA.side, true, true);
 
     plug.setInteractive(new Phaser.Geom.Rectangle(-46, -46, 92, 92), Phaser.Geom.Rectangle.Contains);
     this.input.setDraggable(plug);
@@ -416,26 +425,53 @@ export default class Minigame1 extends Phaser.Scene {
   }
 
   private drawPlugGraphic(
-    g: Phaser.GameObjects.Graphics,
-    color: number,
-    side: Side,
-    isLit: boolean
-  ) {
-    g.clear();
-    const c = isLit ? color : 0x6c7687;
+  g: Phaser.GameObjects.Graphics,
+  color: number,
+  side: Side,
+  isLit: boolean,
+  showDragDot = false
+) {
+  g.clear();
+  const c = isLit ? color : 0x6c7687;
 
-    g.lineStyle(Math.max(2, this.s(5)), c, isLit ? 0.10 : 0.04);
-    g.strokeCircle(0, 0, this.s(19));
-    g.fillStyle(0x121923, 0.7);
-    g.fillCircle(0, 0, this.s(15));
-    g.lineStyle(Math.max(3, this.s(6)), c, 1);
-    g.strokeCircle(0, 0, this.s(13));
-    g.lineStyle(2, 0xffffff, isLit ? 0.20 : 0.08);
-    g.strokeCircle(0, 0, this.s(8));
+  g.lineStyle(Math.max(2, this.s(5)), c, isLit ? 0.10 : 0.04);
+  g.strokeCircle(0, 0, this.s(19));
 
-    const { axis, dir } = this.armConfig(side);
-    this.drawArm(g, c, this.s(32), axis, dir);
+  g.fillStyle(0x121923, 0.7);
+  g.fillCircle(0, 0, this.s(15));
+
+  g.lineStyle(Math.max(3, this.s(6)), c, 1);
+  g.strokeCircle(0, 0, this.s(13));
+
+  g.lineStyle(2, 0xffffff, isLit ? 0.20 : 0.08);
+  g.strokeCircle(0, 0, this.s(8));
+
+  const { axis, dir } = this.armConfig(side);
+  this.drawArm(g, c, this.s(32), axis, dir);
+
+  if (showDragDot) {
+    let dotX = 0;
+    let dotY = 0;
+    const dotOffset = this.s(18);
+    const dotRadius = this.s(4.5);
+
+    if (side === "left") {
+      dotX = dotOffset;
+    } else if (side === "right") {
+      dotX = -dotOffset;
+    } else if (side === "top") {
+      dotY = dotOffset;
+    } else if (side === "bottom") {
+      dotY = -dotOffset;
+    }
+
+    g.fillStyle(0x000000, 0.95);
+    g.fillCircle(dotX, dotY, dotRadius);
+
+    g.lineStyle(1.5, 0xffffff, 0.12);
+    g.strokeCircle(dotX, dotY, dotRadius);
   }
+}
 
   private buildCurve(wire: WireState): Phaser.Curves.CubicBezier {
     const cp = this.s(CABLE_CP1);
@@ -483,30 +519,61 @@ export default class Minigame1 extends Phaser.Scene {
       wire.cable.lineBetween(pts[i].x, pts[i].y - 1, pts[i+1].x, pts[i+1].y - 1);
   }
 
+
+  private vibrateWrongWire(wire: WireState, onComplete?: () => void) {
+  const startX = wire.plug.x;
+  const startY = wire.plug.y;
+
+  this.tweens.add({
+    targets: wire.plug,
+    x: startX - this.s(5),
+    duration: 35,
+    yoyo: true,
+    repeat: 4,
+    onComplete: () => {
+      wire.plug.setPosition(startX, startY);
+      if (onComplete) onComplete();
+    }
+  });
+}
   // ─── Connection logic ────────────────────────────────────────────────────────
 
   private tryConnect(wire: WireState) {
-    const target = wire.socketB;
-    const dist = Phaser.Math.Distance.Between(wire.freeX, wire.freeY, target.x, target.y);
-    const snapRadius = this.s(42) + 8;
+  const target = wire.socketB;
+  const dist = Phaser.Math.Distance.Between(wire.freeX, wire.freeY, target.x, target.y);
+  const snapRadius = this.s(42) + 8;
 
-    // Prevent snap onto own anchor socket
-    const selfDist = Phaser.Math.Distance.Between(wire.freeX, wire.freeY, wire.anchorX, wire.anchorY);
-    if (dist < snapRadius && selfDist > 10) {
-      wire.connected = true;
-      wire.activeGlow = true;
-      wire.freeX = target.x;
-      wire.freeY = target.y;
-      wire.plug.setPosition(wire.freeX, wire.freeY);
-      this.drawPlugGraphic(wire.plugGfx, wire.color.hex, target.side, true);
-      this.drawSocketGraphic(target.gfx, target.color, target.side, true);
-      this.redrawCable(wire);
-      this.tweens.add({ targets: wire.plug, scaleX: 1.08, scaleY: 1.08, duration: 110, yoyo: true });
-      this.checkWin();
-    } else {
+  // Prevent snap onto own anchor socket
+  const selfDist = Phaser.Math.Distance.Between(wire.freeX, wire.freeY, wire.anchorX, wire.anchorY);
+
+  if (dist < snapRadius && selfDist > 10) {
+    wire.connected = true;
+    wire.activeGlow = true;
+    wire.freeX = target.x;
+    wire.freeY = target.y;
+    wire.plug.setPosition(wire.freeX, wire.freeY);
+    this.drawPlugGraphic(wire.plugGfx, wire.color.hex, target.side, true, false);
+    this.drawSocketGraphic(target.gfx, target.color, target.side, true);
+    this.redrawCable(wire);
+
+    this.tweens.add({
+      targets: wire.plug,
+      scaleX: 1.08,
+      scaleY: 1.08,
+      duration: 110,
+      yoyo: true
+    });
+
+    this.checkWin();
+  } else {
+    this.showAlert("ERROR: WRONG CONNECTION", 300);
+    this.cameras.main.shake(120, 0.004);
+
+    this.vibrateWrongWire(wire, () => {
       this.returnWire(wire);
-    }
+    });
   }
+}
 
   private returnWire(wire: WireState) {
     const fromX = wire.plug.x;
@@ -547,7 +614,7 @@ export default class Minigame1 extends Phaser.Scene {
     const winText = this.add
       .text(this.screenX, winY, "COMPLETED: ACCESS UNLOCKED", {
         fontFamily: "Pixelify Sans",
-        fontSize: `${Math.max(14, Math.round(this.s(22)))}px`,
+        fontSize: `${Math.max(18, Math.round(this.s(22)))}px`,
         color: "#70fdc2",
         fontStyle: "bold",
       })

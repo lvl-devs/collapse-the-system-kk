@@ -11,28 +11,25 @@ type BitCell = {
   text: Phaser.GameObjects.Text;
 };
 
-type KeyVisual = {
-  container: Phaser.GameObjects.Container;
-  top: Phaser.GameObjects.Rectangle;
-  label: Phaser.GameObjects.Text;
+type ButtonVisual = {
+  sprite: Phaser.GameObjects.Sprite;
+  idleFrame: number;
+  pressedFrame: number;
   baseY: number;
 };
 
 export default class Minigame3 extends Phaser.Scene {
   private boardX!: number;
   private boardY!: number;
-  private boardW!: number;
-  private boardH!: number;
+  private uiScale!: number;
 
   private monitorX!: number;
   private monitorY!: number;
   private monitorW!: number;
   private monitorH!: number;
 
-  private uiScale!: number;
-
-  private rows = 4;
-  private cols = 8;
+  private rows = 3;
+  private cols = 5;
 
   private gridStartX = 0;
   private gridStartY = 0;
@@ -48,19 +45,38 @@ export default class Minigame3 extends Phaser.Scene {
 
   private progress = 0;
   private acceptingInput = false;
-  private revealPhase = true;
+
+  private screenCenterY = 0;
 
   private progressFill?: Phaser.GameObjects.Rectangle;
   private progressText?: Phaser.GameObjects.Text;
   private statusText?: Phaser.GameObjects.Text;
   private infoText?: Phaser.GameObjects.Text;
-  private alertBg?: Phaser.GameObjects.Rectangle;
-  private alertText?: Phaser.GameObjects.Text;
+  private displayImage?: Phaser.GameObjects.Image;
 
-  private keyViews: Record<string, KeyVisual> | null = null;
+  private deniedImage?: Phaser.GameObjects.Image;
+  private grantedImage?: Phaser.GameObjects.Image;
+
+  private titleText?: Phaser.GameObjects.Text;
+private subtitleText?: Phaser.GameObjects.Text;
+private progressBg?: Phaser.GameObjects.Rectangle;
+
+  private buttonViews: Record<string, ButtonVisual> | null = null;
 
   constructor() {
     super("Minigame3");
+  }
+
+  preload() {
+    this.load.image("min3_computer", "../assets/images/min3/4.png");
+    this.load.image("min3_display", "../assets/images/min3/Display.png");
+    this.load.image("min3_pad", "../assets/images/min3/5_4_2.png");
+    this.load.image("min3_accessGranted", "../assets/images/min3/Access_granted.png");
+    this.load.image("min3_topDeco", "../assets/images/min3/7_2.png");
+    this.load.spritesheet("min3_buttons", "../assets/images/min3/Buttons.png", {
+      frameWidth: 42,
+      frameHeight: 42
+    });
   }
 
   create() {
@@ -71,17 +87,16 @@ export default class Minigame3 extends Phaser.Scene {
       this.scene.restart();
     });
 
-    this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.82);
+
 
     this.computeResponsiveLayout(width, height);
-    this.drawComputer();
+    this.drawMachine();
     this.createCloseButton();
-    this.createHeaderTexts();
-    this.createAlert();
-    this.createFileEditorUI();
+    this.createTexts();
+    this.createProgressBar();
     this.createBitGrid();
     this.createCursor();
-    this.createKeyboardVisuals();
+    this.createControls();
 
     this.input.keyboard?.on("keydown", this.handleKeyPress, this);
 
@@ -89,191 +104,63 @@ export default class Minigame3 extends Phaser.Scene {
   }
 
   private computeResponsiveLayout(width: number, height: number) {
-    const maxW = width * 0.9;
-    const maxH = height * 0.88;
-    const pcRatio = 1.45;
+  this.boardX = width / 2;
+  this.boardY = height / 2;
 
-    this.boardW = Math.min(maxW, maxH * pcRatio, 1180);
-    this.boardH = this.boardW / pcRatio;
+  this.uiScale = Phaser.Math.Clamp(Math.min(width / 1366, height / 768), 0.78, 1.28);
 
-    if (this.boardH > maxH) {
-      this.boardH = maxH;
-      this.boardW = this.boardH * pcRatio;
-    }
+  this.monitorX = this.boardX;
+  this.monitorY = this.boardY - 55 * this.uiScale;
 
-    this.boardX = width / 2;
-    this.boardY = height / 2;
+  this.monitorW = Math.min(width * 0.54, 700) * this.uiScale;
+  this.monitorH = Math.min(height * 0.42, 360) * this.uiScale;
 
-    this.monitorW = this.boardW * 0.78;
-    this.monitorH = this.boardH * 0.48;
-    this.monitorX = this.boardX;
-    this.monitorY = this.boardY - this.boardH * 0.16;
+  // centro visivo della parte interattiva dentro lo schermo
+  this.screenCenterY = this.monitorY - 4 * this.uiScale;
+}
+  private drawMachine() {
+  const computer = this.add.image(
+    this.boardX,
+    this.boardY + 12 * this.uiScale,
+    "min3_computer"
+  );
+  computer.setOrigin(0.5);
+  computer.setScale(this.uiScale * 2.1);
 
-    this.uiScale = Phaser.Math.Clamp(this.boardW / 1100, 0.72, 1.05);
-  }
-
-  private drawComputer() {
-    const g = this.add.graphics();
-
-    const x = this.boardX - this.boardW / 2;
-    const y = this.boardY - this.boardH / 2;
-
-    g.fillStyle(0x202733, 1);
-    g.fillRoundedRect(x, y, this.boardW, this.boardH, 20 * this.uiScale);
-
-    const monitorOuterW = this.monitorW + 70 * this.uiScale;
-    const monitorOuterH = this.monitorH + 68 * this.uiScale;
-    const monitorOuterX = this.monitorX - monitorOuterW / 2;
-    const monitorOuterY = this.monitorY - monitorOuterH / 2;
-
-    g.fillStyle(0x5f6877, 1);
-    g.fillRoundedRect(
-      monitorOuterX,
-      monitorOuterY,
-      monitorOuterW,
-      monitorOuterH,
-      18 * this.uiScale
-    );
-
-    g.lineStyle(Math.max(3, 5 * this.uiScale), 0x1e232b, 1);
-    g.strokeRoundedRect(
-      monitorOuterX,
-      monitorOuterY,
-      monitorOuterW,
-      monitorOuterH,
-      18 * this.uiScale
-    );
-
-    g.lineStyle(2, 0xaab4c2, 0.25);
-    g.strokeRoundedRect(
-      monitorOuterX + 6 * this.uiScale,
-      monitorOuterY + 6 * this.uiScale,
-      monitorOuterW - 12 * this.uiScale,
-      monitorOuterH - 12 * this.uiScale,
-      14 * this.uiScale
-    );
-
-    g.fillStyle(0x111926, 1);
-    g.fillRoundedRect(
-      this.monitorX - this.monitorW / 2,
-      this.monitorY - this.monitorH / 2,
-      this.monitorW,
-      this.monitorH,
-      12 * this.uiScale
-    );
-
-    g.lineStyle(3, 0x39f4ff, 0.55);
-    g.strokeRoundedRect(
-      this.monitorX - this.monitorW / 2,
-      this.monitorY - this.monitorH / 2,
-      this.monitorW,
-      this.monitorH,
-      12 * this.uiScale
-    );
-
-    g.lineStyle(1, 0x9dfdff, 0.35);
-    g.strokeRoundedRect(
-      this.monitorX - this.monitorW / 2 + 6 * this.uiScale,
-      this.monitorY - this.monitorH / 2 + 6 * this.uiScale,
-      this.monitorW - 12 * this.uiScale,
-      this.monitorH - 12 * this.uiScale,
-      9 * this.uiScale
-    );
-
-    const standTopY = this.monitorY + this.monitorH / 2 + 14 * this.uiScale;
-
-    g.fillStyle(0x586171, 1);
-    g.fillRoundedRect(
-      this.boardX - 22 * this.uiScale,
-      standTopY,
-      44 * this.uiScale,
-      78 * this.uiScale,
-      8 * this.uiScale
-    );
-
-    g.fillStyle(0x6a7485, 1);
-    g.fillRoundedRect(
-      this.boardX - 120 * this.uiScale,
-      standTopY + 70 * this.uiScale,
-      240 * this.uiScale,
-      24 * this.uiScale,
-      10 * this.uiScale
-    );
-
-    g.lineStyle(2, 0x1d222a, 1);
-    g.strokeRoundedRect(
-      this.boardX - 120 * this.uiScale,
-      standTopY + 70 * this.uiScale,
-      240 * this.uiScale,
-      24 * this.uiScale,
-      10 * this.uiScale
-    );
-
-    const kbW = this.boardW * 0.76;
-    const kbH = this.boardH * 0.25;
-    const kbX = this.boardX - kbW / 2;
-    const kbY = this.boardY + this.boardH * 0.21;
-
-    g.fillStyle(0x343c49, 1);
-    g.fillRoundedRect(kbX, kbY, kbW, kbH, 22 * this.uiScale);
-
-    g.fillStyle(0x4a5363, 1);
-    g.fillRoundedRect(
-      kbX + 10 * this.uiScale,
-      kbY + 10 * this.uiScale,
-      kbW - 20 * this.uiScale,
-      kbH - 20 * this.uiScale,
-      16 * this.uiScale
-    );
-
-    g.lineStyle(3, 0x171b21, 1);
-    g.strokeRoundedRect(kbX, kbY, kbW, kbH, 22 * this.uiScale);
-
-    const deco = this.add.graphics();
-    deco.lineStyle(2, 0x3af7ff, 0.25);
-
-    deco.strokeRect(
-      this.monitorX - this.monitorW / 2 + this.monitorW * 0.03,
-      this.monitorY - this.monitorH / 2 + this.monitorH * 0.04,
-      this.monitorW * 0.03,
-      this.monitorH * 0.035
-    );
-
-    deco.strokeRect(
-      this.monitorX + this.monitorW / 2 - this.monitorW * 0.06,
-      this.monitorY - this.monitorH / 2 + this.monitorH * 0.04,
-      this.monitorW * 0.03,
-      this.monitorH * 0.035
-    );
-  }
+  this.displayImage = this.add.image(this.monitorX, this.monitorY, "min3_display");
+this.displayImage.setOrigin(0.5);
+this.displayImage.setDisplaySize(
+  this.monitorW * 0.5,
+  this.monitorH * 0.5
+);
+}
 
   private createCloseButton() {
-    const closeBtnSize = Math.max(18, 20 * this.uiScale);
-    const closeX = this.monitorX + this.monitorW / 2 + 20 * this.uiScale;
-    const closeY = this.monitorY - this.monitorH / 2 - 18 * this.uiScale;
+    const closeX = this.monitorX + this.monitorW / 2 + 112 * this.uiScale;
+    const closeY = this.monitorY - this.monitorH / 2 - 42 * this.uiScale;
 
     const closeBg = this.add
-      .circle(closeX, closeY, 14 * this.uiScale, 0x1a2230, 0.95)
-      .setStrokeStyle(2, 0x8df6ff, 0.45)
+      .circle(closeX, closeY, 18 * this.uiScale, 0x4a1847, 0.96)
+      .setStrokeStyle(2, 0xff66d8, 0.8)
       .setInteractive({ useHandCursor: true });
 
     const closeText = this.add
       .text(closeX, closeY, "X", {
         fontFamily: "Pixelify Sans",
-        fontSize: `${closeBtnSize}px`,
-        color: "#d7faff",
+        fontSize: `${Math.max(18, Math.round(22 * this.uiScale))}px`,
+        color: "#ffffff",
         fontStyle: "bold"
       })
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
 
     const over = () => {
-      closeBg.setFillStyle(0x243247, 1);
+      closeBg.setScale(1.08);
       closeText.setScale(1.08);
     };
 
     const out = () => {
-      closeBg.setFillStyle(0x1a2230, 0.95);
+      closeBg.setScale(1);
       closeText.setScale(1);
     };
 
@@ -292,349 +179,231 @@ export default class Minigame3 extends Phaser.Scene {
     closeText.on("pointerdown", close);
   }
 
-  private createHeaderTexts() {
-    const titleSize = Math.max(24, Math.round(30 * this.uiScale));
+  private createTexts() {
+  const topY = this.screenCenterY - 140 * this.uiScale;
 
-    this.add
-      .text(
-        this.boardX,
-        this.monitorY - this.monitorH / 2 - 54 * this.uiScale,
-        "FILE EDIT",
-        {
-          fontFamily: "Pixelify Sans",
-          fontSize: `${titleSize}px`,
-          color: "#7dff8f",
-          fontStyle: "bold",
-          stroke: "#14311a",
-          strokeThickness: Math.max(3, Math.round(5 * this.uiScale))
-        }
-      )
-      .setOrigin(0.5);
+  this.titleText = this.add
+  .text(this.monitorX, topY, "FILE MODIFICATION", {
+    fontFamily: "Pixelify Sans",
+    fontSize: `${Math.max(35, Math.round(45 * this.uiScale))}px`,
+    color: "#46ff88",
+    fontStyle: "bold",
+    stroke: "#09100c",
+    strokeThickness: 4
+  })
+  .setOrigin(0.5);
 
-    const hintY = this.monitorY - this.monitorH / 2 + this.monitorH * 0.11;
+  this.subtitleText = this.add
+  .text(this.monitorX, topY + 34 * this.uiScale, "MEMORIZE THE BITS, THEN PATCH THE FILE", {
+    fontFamily: "Pixelify Sans",
+    fontSize: `${Math.max(15, Math.round(18 * this.uiScale))}px`,
+    color: "#8de8ff",
+    fontStyle: "bold"
+  })
+  .setOrigin(0.5);
 
-    const hintBg = this.add
-      .rectangle(
-        this.monitorX,
-        hintY,
-        this.monitorW * 0.72,
-        Math.max(34, 38 * this.uiScale),
-        0x10202a,
-        0.88
-      )
-      .setOrigin(0.5)
-      .setStrokeStyle(2, 0x39f4ff, 0.35);
-
-    const hintText = this.add
-      .text(
-        this.monitorX,
-        hintY,
-        "MEMORIZE THE HIGHLIGHTED BITS, THEN EDIT THE FILE",
-        {
-          fontFamily: "Pixelify Sans",
-          fontSize: `${Math.max(12, Math.round(15 * this.uiScale))}px`,
-          color: "#bafcff",
-          fontStyle: "bold",
-          align: "center"
-        }
-      )
-      .setOrigin(0.5);
-
-    hintBg.setAlpha(0);
-    hintText.setAlpha(0);
-
-    this.tweens.add({
-      targets: [hintBg, hintText],
-      alpha: 1,
-      duration: 2100,
-      ease: "Sine.Out"
-    });
-
-    this.tweens.add({
-      targets: [hintBg, hintText],
-      alpha: 0,
-      duration: 500,
-      delay: 1800,
-      ease: "Sine.In"
-    });
-  }
-
-  private createAlert() {
-    const alertY = this.monitorY - this.monitorH / 2 + this.monitorH * 0.06;
-
-    this.alertBg = this.add
-      .rectangle(
-        this.monitorX,
-        alertY,
-        this.monitorW * 0.34,
-        Math.max(24, 30 * this.uiScale),
-        0xff2f3d,
-        0.92
-      )
-      .setOrigin(0.5)
-      .setStrokeStyle(2, 0xffffff, 0.18)
-      .setAlpha(0);
-
-    this.alertText = this.add
-      .text(this.monitorX, alertY, "", {
+  this.statusText = this.add
+    .text(
+      this.monitorX,
+      this.screenCenterY + 100 * this.uiScale,
+      "",
+      {
         fontFamily: "Pixelify Sans",
-        fontSize: `${Math.max(12, Math.round(16 * this.uiScale))}px`,
-        color: "#ffffff",
+        fontSize: `${Math.max(16, Math.round(20 * this.uiScale))}px`,
+        color: "#d7f8ff",
         fontStyle: "bold"
-      })
-      .setOrigin(0.5)
-      .setAlpha(0);
-  }
+      }
+    )
+    .setOrigin(0.5)
+    .setAlpha(0);
 
-  private createFileEditorUI() {
-    const centerY = this.monitorY + this.monitorH * 0.01;
+  this.grantedImage = this.add
+    .image(this.monitorX, this.monitorY, "min3_accessGranted")
+    .setOrigin(0.5)
+    .setScale(this.uiScale * 1.2)
+    .setAlpha(0);
+}
 
-    this.add
-      .text(this.monitorX, centerY - this.monitorH * 0.26, "BINARY FILE EDITOR", {
-        fontFamily: "Pixelify Sans",
-        fontSize: `${Math.max(18, Math.round(24 * this.uiScale))}px`,
-        color: "#8eeeff",
-        fontStyle: "bold"
-      })
-      .setOrigin(0.5);
+  private createProgressBar() {
+  const barW = this.monitorW * 0.54;
+  const barH = Math.max(25, 35 * this.uiScale);
+  const barY = this.screenCenterY - 65 * this.uiScale;
 
-    const barW = this.monitorW * 0.58;
-    const barH = Math.max(26, 32 * this.uiScale);
-    const barY = centerY - this.monitorH * 0.14;
+  this.progressBg = this.add
+  .rectangle(this.monitorX, barY, barW, barH, 0x08111d, 0.96)
+  .setStrokeStyle(2, 0x46ff88, 0.9)
+  .setOrigin(0.5);
 
-    this.add
-      .rectangle(this.monitorX, barY, barW, barH, 0x0c131c, 0.96)
-      .setStrokeStyle(3, 0x53f6ff, 0.45)
-      .setOrigin(0.5);
+  this.progressFill = this.add
+    .rectangle(
+      this.monitorX - barW / 2 + 3 * this.uiScale,
+      barY,
+      0,
+      barH - 6,
+      0x44ff88,
+      0.95
+    )
+    .setOrigin(0, 0.5);
 
-    this.progressFill = this.add
-      .rectangle(
-        this.monitorX - barW / 2 + 5 * this.uiScale,
-        barY,
-        0,
-        barH - 10,
-        0x67ff8f,
-        0.95
-      )
-      .setOrigin(0, 0.5);
-
-    this.progressText = this.add
-      .text(this.monitorX, barY, "0%", {
-        fontFamily: "Pixelify Sans",
-        fontSize: `${Math.max(16, Math.round(22 * this.uiScale))}px`,
-        color: "#ffffff",
-        fontStyle: "bold"
-      })
-      .setOrigin(0.5);
-
-    this.infoText = this.add
-      .text(
-        this.monitorX,
-        centerY + this.monitorH * 0.21,
-        "ARROWS = MOVE   SPACE / ENTER = CHANGE BIT",
-        {
-          fontFamily: "Pixelify Sans",
-          fontSize: `${Math.max(12, Math.round(15 * this.uiScale))}px`,
-          color: "#8afcff",
-          fontStyle: "bold",
-          align: "center"
-        }
-      )
-      .setOrigin(0.5);
-
-    this.statusText = this.add
-      .text(
-        this.monitorX,
-        centerY + this.monitorH * 0.31,
-        "MEMORIZE THE TARGET POSITIONS...",
-        {
-          fontFamily: "Pixelify Sans",
-          fontSize: `${Math.max(14, Math.round(18 * this.uiScale))}px`,
-          color: "#bafcff",
-          fontStyle: "bold"
-        }
-      )
-      .setOrigin(0.5);
-  }
+  this.progressText = this.add
+    .text(this.monitorX, barY, "0%", {
+      fontFamily: "Pixelify Sans",
+      fontSize: `${Math.max(15, Math.round(20 * this.uiScale))}px`,
+      color: "#ffffff",
+      fontStyle: "bold"
+    })
+    .setOrigin(0.5);
+}
 
   private createBitGrid() {
-    const gridW = this.monitorW * 0.62;
-    const gridH = this.monitorH * 0.38;
+  const gridW = this.monitorW * 0.40;
+  const gridH = this.monitorH * 0.36;
 
-    this.cellW = gridW / this.cols;
-    this.cellH = gridH / this.rows;
+  this.cellW = gridW / this.cols;
+  this.cellH = gridH / this.rows;
 
-    this.gridStartX = this.monitorX - gridW / 2 + this.cellW / 2;
-    this.gridStartY = this.monitorY + this.monitorH * 0.16 - gridH / 2 + this.cellH / 2;
+  this.gridStartX = this.monitorX - gridW / 2 + this.cellW / 2;
+  this.gridStartY = this.screenCenterY + 20 * this.uiScale;
 
-    this.cells = [];
+  this.cells = [];
 
-    for (let r = 0; r < this.rows; r++) {
-      for (let c = 0; c < this.cols; c++) {
-        const x = this.gridStartX + c * this.cellW;
-        const y = this.gridStartY + r * this.cellH;
+  for (let r = 0; r < this.rows; r++) {
+    for (let c = 0; c < this.cols; c++) {
+      const x = this.gridStartX + c * this.cellW;
+      const y = this.gridStartY - gridH / 2 + this.cellH / 2 + r * this.cellH;
 
-        const value = Phaser.Math.Between(0, 1);
+      const value = Phaser.Math.Between(0, 1);
 
-        const rect = this.add
-          .rectangle(
-            x,
-            y,
-            this.cellW - 8 * this.uiScale,
-            this.cellH - 8 * this.uiScale,
-            0x13202b,
-            0.95
-          )
-          .setStrokeStyle(2, 0x39f4ff, 0.22)
-          .setInteractive({ useHandCursor: true });
-
-        const text = this.add
-          .text(x, y, String(value), {
-            fontFamily: "Pixelify Sans",
-            fontSize: `${Math.max(20, Math.round(28 * this.uiScale))}px`,
-            color: value === 1 ? "#7dff8f" : "#d7faff",
-            fontStyle: "bold"
-          })
-          .setOrigin(0.5);
-
-        const cell: BitCell = {
-          row: r,
-          col: c,
+      const rect = this.add
+        .rectangle(
           x,
           y,
-          value,
-          targetValue: value,
-          rect,
-          text
-        };
+          this.cellW - 8 * this.uiScale,
+          this.cellH - 6 * this.uiScale,
+          0x0d1723,
+          0.94
+        )
+        .setStrokeStyle(2, 0x36ddff, 0.18)
+        .setInteractive({ useHandCursor: true });
 
-        rect.on("pointerdown", () => {
-          if (!this.acceptingInput) return;
-          this.cursorRow = r;
-          this.cursorCol = c;
-          this.updateCursorPosition();
-          this.toggleCurrentCell();
-        });
+      const text = this.add
+        .text(x, y, String(value), {
+          fontFamily: "Pixelify Sans",
+          fontSize: `${Math.max(12, Math.round(15 * this.uiScale))}px`,
+          color: value === 1 ? "#46ff88" : "#e0f9ff",
+          fontStyle: "bold"
+        })
+        .setOrigin(0.5);
 
-        this.cells.push(cell);
-      }
+      const cell: BitCell = {
+        row: r,
+        col: c,
+        x,
+        y,
+        value,
+        targetValue: value,
+        rect,
+        text
+      };
+
+      rect.on("pointerdown", () => {
+        if (!this.acceptingInput) return;
+        this.cursorRow = r;
+        this.cursorCol = c;
+        this.updateCursorPosition();
+        this.toggleCurrentCell();
+      });
+
+      this.cells.push(cell);
     }
   }
+}
 
   private createCursor() {
-    this.cursorRect = this.add
-      .rectangle(0, 0, this.cellW - 2 * this.uiScale, this.cellH - 2 * this.uiScale)
-      .setStrokeStyle(3, 0xffd966, 0.95)
-      .setFillStyle(0xffffff, 0)
-      .setOrigin(0.5);
+  this.cursorRect = this.add
+    .rectangle(0, 0, this.cellW - 4 * this.uiScale, this.cellH - 4 * this.uiScale)
+    .setStrokeStyle(2, 0xffd84a, 1)
+    .setFillStyle(0xffffff, 0)
+    .setOrigin(0.5);
 
-    this.updateCursorPosition();
-  }
+  this.updateCursorPosition();
+}
 
-  private createKeyboardVisuals() {
-    const kbW = this.boardW * 0.76;
-    const kbH = this.boardH * 0.25;
-    const kbX = this.boardX - kbW / 2;
-    const kbY = this.boardY + this.boardH * 0.21;
+  private createControls() {
+  // PAD nel vuoto in basso a destra
+  const padX = this.monitorX + this.monitorW / 2 - 168* this.uiScale;
+  const padY = this.monitorY + this.monitorH / 2 + 105 * this.uiScale;
 
-    const keyW = 74 * this.uiScale;
-    const keyH = 48 * this.uiScale;
-    const gapX = 18 * this.uiScale;
-    const gapY = 10 * this.uiScale;
+  const pad = this.add.image(padX, padY, "min3_pad");
+  pad.setOrigin(0.5);
+  pad.setScale(this.uiScale * 1.45);
 
-    const centerX = this.boardX;
-    const baseY = kbY + kbH * 0.30;
+  const up = this.add.sprite(
+    padX,
+    padY - 30 * this.uiScale,
+    "min3_buttons",
+    2
+  );
 
-    const arrowTopY = baseY + 8 * this.uiScale;
-    const arrowBottomY = arrowTopY + keyH + gapY;
+  const left = this.add.sprite(
+    padX - 35 * this.uiScale,
+    padY + 8 * this.uiScale,
+    "min3_buttons",
+    0
+  );
 
-    const leftX = centerX - (keyW + gapX);
-    const downX = centerX;
-    const rightX = centerX + (keyW + gapX);
-    const upX = centerX;
+  const down = this.add.sprite(
+    padX,
+    padY + 45 * this.uiScale,
+    "min3_buttons",
+    6
+  );
 
-    const spaceW = 210 * this.uiScale;
-    const enterW = 110 * this.uiScale;
+  const right = this.add.sprite(
+    padX + 35 * this.uiScale,
+    padY + 5 * this.uiScale,
+    "min3_buttons",
+    4
+  );
 
-    const lowerRowY = kbY + kbH * 0.72;
-    const spaceX = centerX - 110 * this.uiScale;
-    const enterX = centerX + 120 * this.uiScale;
+  [up, left, down, right].forEach((s) => s.setScale(this.uiScale * 1.5));
 
-    this.keyViews = {
-      UP: this.createKeyboardKey(upX, arrowTopY, keyW, keyH, "↑"),
-      LEFT: this.createKeyboardKey(leftX, arrowBottomY, keyW, keyH, "←"),
-      DOWN: this.createKeyboardKey(downX, arrowBottomY, keyW, keyH, "↓"),
-      RIGHT: this.createKeyboardKey(rightX, arrowBottomY, keyW, keyH, "→"),
-      SPACE: this.createKeyboardKey(spaceX, lowerRowY, spaceW, keyH, "SPACE"),
-      ENTER: this.createKeyboardKey(enterX, lowerRowY, enterW, keyH, "ENTER")
-    };
-  }
+  // pulsante separato, più vicino al pad e non sopra il monitor
+  const actionBaseX = this.boardX - 170 * this.uiScale;
+  const actionBaseY = this.boardY + 215 * this.uiScale;
 
-  private createKeyboardKey(
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    labelText: string
-  ): KeyVisual {
-    const container = this.add.container(x, y);
+  const actionBtn = this.add.sprite(
+    actionBaseX,
+    actionBaseY + 10 * this.uiScale,
+    "min3_buttons",
+    8
+  );
+  actionBtn.setScale(this.uiScale * 1.1);
 
-    const shadow = this.add
-      .rectangle(0, 5 * this.uiScale, w, h, 0x171c22, 1)
-      .setOrigin(0.5)
-      .setStrokeStyle(2, 0x0d1117, 1);
-
-    const top = this.add
-      .rectangle(0, 0, w, h, 0x7a8594, 1)
-      .setOrigin(0.5)
-      .setStrokeStyle(2, 0xc7d1db, 0.22);
-
-    const shine = this.add
-      .rectangle(0, -h * 0.18, w * 0.78, h * 0.16, 0xffffff, 0.1)
-      .setOrigin(0.5);
-
-    const fontSize =
-      labelText.length > 2
-        ? Math.max(14, Math.round(18 * this.uiScale))
-        : Math.max(26, Math.round(34 * this.uiScale));
-
-    const label = this.add
-      .text(0, -1 * this.uiScale, labelText, {
-        fontFamily: "Arial",
-        fontSize: `${fontSize}px`,
-        color: "#eef8ff",
-        fontStyle: "bold"
-      })
-      .setOrigin(0.5);
-
-    container.add([shadow, top, shine, label]);
-
-    return {
-      container,
-      top,
-      label,
-      baseY: y
-    };
-  }
+  this.buttonViews = {
+    LEFT: { sprite: left, idleFrame: 0, pressedFrame: 1, baseY: left.y },
+    UP: { sprite: up, idleFrame: 2, pressedFrame: 3, baseY: up.y },
+    RIGHT: { sprite: right, idleFrame: 4, pressedFrame: 5, baseY: right.y },
+    DOWN: { sprite: down, idleFrame: 6, pressedFrame: 7, baseY: down.y },
+    ACTION: { sprite: actionBtn, idleFrame: 8, pressedFrame: 9, baseY: actionBtn.y }
+  };
+}
 
   private startRound() {
-    this.acceptingInput = false;
-    this.revealPhase = true;
-    this.progress = 0;
-    this.updateProgressUI();
+  this.acceptingInput = false;
+  this.progress = 0;
+  this.updateProgressUI();
 
-    this.generateTargets();
-    this.updateGridVisuals(true);
-    this.showStatus("MEMORIZE THE HIGHLIGHTED BITS", "#8afcff");
+  this.generateTargets();
+  this.updateGridVisuals(true);
+  this.showStatus("MEMORIZE THE HIGHLIGHTED BITS", "#8de8ff");
 
-    this.time.delayedCall(2600, () => {
-      this.revealPhase = false;
-      this.acceptingInput = true;
-      this.updateGridVisuals(false);
-      this.showStatus("EDIT THE FILE", "#70fdc2");
-      this.showAlert("MEMORY PHASE ENDED", 650);
-    });
-  }
+  this.time.delayedCall(3200, () => {
+    this.acceptingInput = true;
+    this.updateGridVisuals(false);
+    this.showStatus("EDIT THE FILE", "#46ff88");
+  });
+}
 
   private generateTargets() {
     this.targetIndexes = [];
@@ -643,7 +412,7 @@ export default class Minigame3 extends Phaser.Scene {
       cell.targetValue = cell.value;
     }
 
-    const count = 6;
+    const count = 4;
     const allIndexes = Phaser.Utils.Array.NumberArray(0, this.cells.length - 1);
     Phaser.Utils.Array.Shuffle(allIndexes);
 
@@ -690,59 +459,58 @@ export default class Minigame3 extends Phaser.Scene {
 
     if (event.code === "Space") {
       if (!this.acceptingInput) return;
-      this.pressVisualKey("SPACE");
+      this.pressVisualKey("ACTION");
       this.toggleCurrentCell();
       return;
     }
 
     if (event.code === "Enter" || event.code === "NumpadEnter") {
       if (!this.acceptingInput) return;
-      this.pressVisualKey("ENTER");
+      this.pressVisualKey("ACTION");
       this.toggleCurrentCell();
     }
   }
 
   private pressVisualKey(key: string) {
-    if (!this.keyViews) return;
+    if (!this.buttonViews) return;
 
-    const keyView = this.keyViews[key];
-    if (!keyView) return;
+    const view = this.buttonViews[key];
+    if (!view) return;
 
-    this.tweens.killTweensOf([keyView.container, keyView.top, keyView.label]);
+    this.tweens.killTweensOf(view.sprite);
 
-    keyView.container.y = keyView.baseY + 4 * this.uiScale;
-    keyView.top.setFillStyle(0x5f6977, 1);
-    keyView.label.y = 2 * this.uiScale;
+    view.sprite.setFrame(view.pressedFrame);
+    view.sprite.y = view.baseY + 4 * this.uiScale;
 
     this.time.delayedCall(90, () => {
-      keyView.container.y = keyView.baseY;
-      keyView.top.setFillStyle(0x7a8594, 1);
-      keyView.label.y = -1 * this.uiScale;
+      view.sprite.setFrame(view.idleFrame);
+      view.sprite.y = view.baseY;
     });
   }
 
   private toggleCurrentCell() {
-    const cell = this.getCell(this.cursorRow, this.cursorCol);
-    if (!cell) return;
+  const cell = this.getCell(this.cursorRow, this.cursorCol);
+  if (!cell) return;
 
-    cell.value = cell.value === 0 ? 1 : 0;
-    cell.text.setText(String(cell.value));
-    cell.text.setColor(cell.value === 1 ? "#7dff8f" : "#d7faff");
+  cell.value = cell.value === 0 ? 1 : 0;
+  cell.text.setText(String(cell.value));
+  cell.text.setColor(cell.value === 1 ? "#46ff88" : "#e0f9ff");
 
-    this.flashCell(cell);
+  this.flashCell(cell);
+  this.updateProgressFromState();
+
+  if (cell.value === cell.targetValue) {
     this.updateGridVisuals(false);
-    this.updateProgressFromState();
-
-    if (cell.value === cell.targetValue) {
-      this.showStatus("BIT MODIFIED", "#70fdc2");
-    } else {
-      this.showStatus("CHECK THAT BIT", "#ff8b8b");
-    }
-
-    if (this.isTaskCompleted()) {
-      this.completeTask();
-    }
+    this.showStatus("BIT MODIFIED", "#46ff88");
+  } else {
+    this.showStatus("ERROR: WRONG BIT", "#ff4d6d");
+    this.errorCell(cell);
   }
+
+  if (this.isTaskCompleted()) {
+    this.completeTask();
+  }
+}
 
   private getCell(row: number, col: number) {
     return this.cells.find((cell) => cell.row === row && cell.col === col);
@@ -763,156 +531,186 @@ export default class Minigame3 extends Phaser.Scene {
       const isCursor = cell.row === this.cursorRow && cell.col === this.cursorCol;
       const isTarget = this.targetIndexes.includes(i);
 
-      let fill = 0x13202b;
-      let stroke = 0x39f4ff;
+      let fill = 0x0d1723;
+      let stroke = 0x36ddff;
       let strokeAlpha = 0.22;
 
       if (showTargets && isTarget) {
-        fill = 0x2b1a36;
-        stroke = 0xff73ef;
-        strokeAlpha = 0.9;
+        fill = 0x2a1030;
+        stroke = 0xff57c7;
+        strokeAlpha = 1;
       } else if (!showTargets && cell.value === cell.targetValue && isTarget) {
-        fill = 0x183126;
-        stroke = 0x70fdc2;
-        strokeAlpha = 0.6;
+        fill = 0x12291d;
+        stroke = 0x46ff88;
+        strokeAlpha = 0.75;
       }
 
       if (isCursor) {
-        stroke = 0xffd966;
-        strokeAlpha = 0.95;
+        stroke = 0xffd84a;
+        strokeAlpha = 1;
       }
 
-      cell.rect.setFillStyle(fill, 0.95);
+      cell.rect.setFillStyle(fill, 0.97);
       cell.rect.setStrokeStyle(2, stroke, strokeAlpha);
     }
   }
 
   private updateProgressFromState() {
-    let correct = 0;
+  let correctTargets = 0;
+  let wrongBits = 0;
 
-    for (const index of this.targetIndexes) {
-      const cell = this.cells[index];
-      if (cell.value === cell.targetValue) {
-        correct++;
-      }
+  for (let i = 0; i < this.cells.length; i++) {
+    const cell = this.cells[i];
+    const isTarget = this.targetIndexes.includes(i);
+
+    if (isTarget && cell.value === cell.targetValue) {
+      correctTargets++;
     }
 
-    this.progress = Math.round((correct / this.targetIndexes.length) * 100);
-    this.updateProgressUI();
+    if (!isTarget && cell.value !== cell.targetValue) {
+      wrongBits++;
+    }
   }
+
+  const step = 100 / this.targetIndexes.length;
+
+  this.progress = Math.max(
+    0,
+    Math.min(100, Math.round(correctTargets * step - wrongBits * step))
+  );
+
+  this.updateProgressUI();
+}
 
   private updateProgressUI() {
-    if (!this.progressFill || !this.progressText) return;
+  if (!this.progressFill || !this.progressText) return;
 
-    const maxWidth = this.monitorW * 0.58 - 8 * this.uiScale;
-    const targetWidth = (this.progress / 100) * maxWidth;
+  const maxWidth = this.monitorW * 0.54 - 6 * this.uiScale;
+  const targetWidth = (this.progress / 100) * maxWidth;
 
-    this.tweens.add({
-      targets: this.progressFill,
-      width: targetWidth,
-      duration: 180,
-      ease: "Sine.Out"
-    });
+  this.tweens.add({
+    targets: this.progressFill,
+    width: targetWidth,
+    duration: 180,
+    ease: "Sine.Out"
+  });
 
-    this.progressText.setText(`${Math.round(this.progress)}%`);
-  }
+  this.progressText.setText(`${Math.round(this.progress)}%`);
+}
 
   private flashCell(cell: BitCell) {
     this.tweens.add({
       targets: cell.text,
-      scaleX: 1.18,
-      scaleY: 1.18,
+      scaleX: 1.16,
+      scaleY: 1.16,
       duration: 90,
       yoyo: true
     });
   }
 
+  private errorCell(cell: BitCell) {
+  cell.rect.setFillStyle(0x3a1010, 0.97);
+  cell.rect.setStrokeStyle(2, 0xff4d6d, 1);
+  cell.text.setColor("#ff8aa0");
+
+  this.tweens.add({
+    targets: [cell.rect, cell.text],
+    x: "+=6",
+    duration: 35,
+    yoyo: true,
+    repeat: 3,
+    onComplete: () => {
+      cell.text.setColor(cell.value === 1 ? "#46ff88" : "#e0f9ff");
+      this.updateGridVisuals(false);
+    }
+  });
+}
+
   private showStatus(message: string, color: string) {
-    if (!this.statusText) return;
+  if (!this.statusText) return;
 
-    this.statusText.setText(message);
-    this.statusText.setColor(color);
-    this.statusText.setScale(0.96);
+  this.tweens.killTweensOf(this.statusText);
+
+  this.statusText.setText(message);
+  this.statusText.setColor(color);
+  this.statusText.setAlpha(1);
+  this.statusText.setScale(0.92);
+
+  this.tweens.add({
+    targets: this.statusText,
+    scaleX: 1,
+    scaleY: 1,
+    duration: 100
+  });
+
+  this.tweens.add({
+    targets: this.statusText,
+    alpha: 0,
+    duration: 350,
+    delay: 700
+  });
+}
+
+  private showDenied(hold = 450) {
+    if (!this.deniedImage) return;
+
+    this.tweens.killTweensOf(this.deniedImage);
+    this.deniedImage.setAlpha(1);
 
     this.tweens.add({
-      targets: this.statusText,
-      scaleX: 1,
-      scaleY: 1,
-      duration: 120
-    });
-  }
-
-  private showAlert(message: string, hold = 500) {
-    if (!this.alertText || !this.alertBg) return;
-
-    this.tweens.killTweensOf([this.alertText, this.alertBg]);
-
-    this.alertText.setText(message);
-    this.alertBg.width = this.monitorW * 0.34;
-
-    this.alertBg.setAlpha(0.92);
-    this.alertText.setAlpha(1);
-
-    this.tweens.add({
-      targets: [this.alertText, this.alertBg],
+      targets: this.deniedImage,
       alpha: 0,
-      duration: 550,
+      duration: 450,
       delay: hold
     });
   }
 
-  private isTaskCompleted() {
-    for (const index of this.targetIndexes) {
-      const cell = this.cells[index];
-      if (cell.value !== cell.targetValue) return false;
-    }
-    return true;
+   private isTaskCompleted() {
+  for (const cell of this.cells) {
+    if (cell.value !== cell.targetValue) return false;
   }
+  return true;
+}
 
+private hideMonitorUI() {
+  this.titleText?.setVisible(false);
+  this.subtitleText?.setVisible(false);
+  this.statusText?.setVisible(false);
+
+  this.progressBg?.setVisible(false);
+  this.progressFill?.setVisible(false);
+  this.progressText?.setVisible(false);
+
+  this.cursorRect?.setVisible(false);
+
+  for (const cell of this.cells) {
+    cell.rect.setVisible(false);
+    cell.text.setVisible(false);
+  }
+}
   private completeTask() {
-    this.acceptingInput = false;
-    this.input.keyboard?.off("keydown", this.handleKeyPress, this);
+  this.acceptingInput = false;
+  this.input.keyboard?.off("keydown", this.handleKeyPress, this);
 
-    this.updateGridVisuals(false);
+  this.progress = 100;
+  this.updateProgressUI();
+  this.registry.set("task3Completed", true);
 
-    const winY = this.monitorY + this.monitorH / 2 - this.monitorH * 0.05;
+  this.hideMonitorUI();
 
-    const winBg = this.add
-      .rectangle(
-        this.monitorX,
-        winY,
-        this.monitorW * 0.48,
-        Math.max(30, 36 * this.uiScale),
-        0x1a3a31,
-        0.88
-      )
-      .setStrokeStyle(2, 0x70fdc2, 0.45)
-      .setOrigin(0.5);
 
-    const winText = this.add
-      .text(this.monitorX, winY, "FILE MODIFIED", {
-        fontFamily: "Pixelify Sans",
-        fontSize: `${Math.max(20, Math.round(27 * this.uiScale))}px`,
-        color: "#70fdc2",
-        fontStyle: "bold"
-      })
-      .setOrigin(0.5);
 
-    this.progress = 100;
-    this.updateProgressUI();
-    this.registry.set("task3Completed", true);
-
-    this.tweens.add({
-      targets: [winBg, winText],
-      alpha: 0.72,
-      duration: 260,
-      yoyo: true,
-      repeat: 2
-    });
-
-    this.time.delayedCall(2200, () => {
-      this.scene.stop();
-      this.scene.resume("GamePlay");
-    });
+  if (this.grantedImage) {
+    this.grantedImage.setOrigin(0.5);
+    this.grantedImage.setPosition(this.monitorX, this.monitorY - 30);
+    this.grantedImage.setAlpha(1);
+    this.grantedImage.setScale(this.uiScale * 2.0);
+    this.grantedImage.setDepth(1001);
   }
+
+  this.time.delayedCall(2200, () => {
+    this.scene.stop();
+    this.scene.resume("GamePlay");
+  });
+}
 }

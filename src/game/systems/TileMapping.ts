@@ -114,7 +114,7 @@ export const DEFAULT_TILES: TileMap = {
     // Porta BOTTOM: riga interna — tutto pavimento (dentro la stanza, no post laterali)
     BOTTOM_BODY: [42, 42, 42, 42],
     // Porta LEFT: 4 righe verticali [top, mid1, mid2, bottom] — curve interne ai bordi
-    LEFT:   [[106], [42], [42], [148]],
+    LEFT:   [[106], [42], [42], [210]],
     // Porta RIGHT
     RIGHT:  [[108], [42], [42], [150]],
   },

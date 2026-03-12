@@ -161,13 +161,6 @@ export class DungeonGenerator {
 
       // Top wall - riga 1 (cap arancione)
       groundLayer.weightedRandomize(TILES.WALL.TOP,      left + 1, top,     width - 2, 1);
-      // Propaga tile 4 a destra del primo tile 3: [2...2, 3, 4...4]
-      let fillTop = false;
-      for (let cx = left + 1; cx <= right - 1; cx++) {
-        const t = groundLayer.getTileAt(cx, top);
-        if (fillTop) { groundLayer.putTileAt(4, cx, top); }
-        else if (t && t.index === 3) { fillTop = true; }
-      }
       // Top wall - riga 2 (corpo grigio)
       groundLayer.weightedRandomize(TILES.WALL.TOP_BODY, left + 1, top + 1, width - 2, 1);
       // Bottom wall
@@ -226,9 +219,81 @@ export class DungeonGenerator {
       }
     });
 
+    // Pass 2a-fix: when the bottom of a LEFT door (210) is directly right of a RIGHT door bottom (150),
+    // replace 210 with 148 to match the correct visual junction.
+    // Also: when a BOTTOM door frame (148) is directly right of a RIGHT door frame (170),
+    // replace 148 with 210 to match the correct visual junction.
+    for (let ty = 0; ty < dungeon.height; ty++) {
+      for (let tx = 0; tx < dungeon.width; tx++) {
+        const t = groundLayer.getTileAt(tx, ty);
+        if (t && t.index === 210) {
+          const left = groundLayer.getTileAt(tx - 1, ty);
+          if (left && left.index === 150) {
+            groundLayer.putTileAt(148, tx, ty);
+          }
+        } else if (t && t.index === 148) {
+          const left = groundLayer.getTileAt(tx - 1, ty);
+          const right = groundLayer.getTileAt(tx + 1, ty);
+          if (left && left.index === 170) {
+            groundLayer.putTileAt(210, tx, ty);
+          } else if (left && left.index === 189) {
+            groundLayer.putTileAt(210, tx, ty);
+          } else if (right && right.index === 73) {
+            groundLayer.putTileAt(212, tx, ty);
+            groundLayer.putTileAt(194, tx + 1, ty);
+          }
+        } else if (t && t.index === 170) {
+          const below = groundLayer.getTileAt(tx, ty + 1);
+          const right = groundLayer.getTileAt(tx + 1, ty);
+          if (right && right.index === 210) {
+            groundLayer.putTileAt(192, tx, ty);
+          } else if (below && (below.index === 2 || below.index === 3 || below.index === 4)) {
+            groundLayer.putTileAt(189, tx, ty);
+          }
+        } else if (t && t.index === 150) {
+          const right = groundLayer.getTileAt(tx + 1, ty);
+          if (right && right.index === 148) {
+            // Frame destro di una porta (150) direttamente adiacente al frame sinistro di un'altra (148):
+            // il 150 è spurio, sostituire con parete inferiore normale.
+            groundLayer.putTileAt(170, tx, ty);
+          } else if (right && right.index === 189) {
+            groundLayer.putTileAt(212, tx, ty);
+          } else if (right && right.index === 170) {
+            const belowRight = groundLayer.getTileAt(tx + 1, ty + 1);
+            if (belowRight && (belowRight.index === 2 || belowRight.index === 3 || belowRight.index === 4)) {
+              groundLayer.putTileAt(212, tx, ty);
+            }
+          }
+        } else if (t && t.index === 171) {
+          const left = groundLayer.getTileAt(tx - 1, ty);
+          if (left && left.index === 189) {
+            groundLayer.putTileAt(194, tx, ty);
+          }
+        } else if (t && t.index === 73) {
+          const left = groundLayer.getTileAt(tx - 1, ty);
+          if (left && left.index === 148) {
+            groundLayer.putTileAt(212, tx - 1, ty);
+            groundLayer.putTileAt(194, tx, ty);
+          }
+        }
+      }
+    }
+
     // Pass 2b: Place corners and cap rows now that ALL door positions are known.
     dungeon.rooms.forEach((room) => {
       const { left, right, top, bottom } = room;
+
+      // Propaga tile 4 dopo il primo tile 3 nel top wall row, saltando le aperture porta (42)
+      // Gira qui (Pass 2b) in modo da vedere i tile di porta già piazzati da Pass 2a.
+      let fillTop = false;
+      for (let cx = left + 1; cx <= right - 1; cx++) {
+        const t = groundLayer.getTileAt(cx, top);
+        if (fillTop) {
+          if (!t || t.index !== 42) { groundLayer.putTileAt(4, cx, top); }
+        } else if (t && t.index === 3) {
+          fillTop = true;
+        }
+      }
 
       // Corners
       groundLayer.putTileAt(TILES.WALL.TOP_LEFT,  left,  top);
@@ -239,24 +304,35 @@ export class DungeonGenerator {
       groundLayer.putTileAt(topLeftBodyTile,  left,  top + 1);
       groundLayer.putTileAt(topRightBodyTile, right, top + 1);
       // Bottom corners: se il vicino esterno è una door tile, usa WALL.BOTTOM plain;
-      // se il vicino interno (left+1) è una door tile, usa tile 70 e sovrascrive il door con 71
-      const bottomRightTile = blockedDoorTiles.has(`${right + 1},${bottom}`) ? TILES.WALL.BOTTOM[0].index as number
-                            : blockedDoorTiles.has(`${right - 1},${bottom}`) ? 73
+      // se il vicino interno (left+1) è una door tile, usa tile 214/210 o 194/212.
+      // Se il corner stesso è già occupato da un tile di porta (blockedDoorTiles), non sovrascrivere.
+      const bottomRightBlocked = blockedDoorTiles.has(`${right},${bottom}`);
+      const bottomRightTile = bottomRightBlocked
+                            ? null
+                            : blockedDoorTiles.has(`${right + 1},${bottom}`) ? TILES.WALL.BOTTOM[0].index as number
+                            : blockedDoorTiles.has(`${right - 1},${bottom}`) ? 194
                             : TILES.WALL.BOTTOM_RIGHT;
-      const bottomLeftTile  = blockedDoorTiles.has(`${left  - 1},${bottom}`) ? TILES.WALL.BOTTOM[0].index as number
-                            : blockedDoorTiles.has(`${left  + 1},${bottom}`) ? 70
+      const bottomLeftBlocked = blockedDoorTiles.has(`${left},${bottom}`);
+      const bottomLeftTile  = bottomLeftBlocked
+                            ? null
+                            : blockedDoorTiles.has(`${left  - 1},${bottom}`) ? TILES.WALL.BOTTOM[0].index as number
+                            : blockedDoorTiles.has(`${left  + 1},${bottom}`) ? 214
                             : TILES.WALL.BOTTOM_LEFT;
-      groundLayer.putTileAt(bottomRightTile, right, bottom);
-      groundLayer.putTileAt(bottomLeftTile,  left,  bottom);
-      // Se il corner è diventato 70 (door interna a left+1), rimpiazzare anche quel door con 71
-      if (bottomLeftTile === 70) {
-        groundLayer.putTileAt(71, left + 1, bottom);
+      if (bottomRightTile !== null) groundLayer.putTileAt(bottomRightTile, right, bottom);
+      if (bottomLeftTile  !== null) groundLayer.putTileAt(bottomLeftTile,  left,  bottom);
+      // Se il corner è diventato 214 (door interna a left+1), rimpiazzare anche quel door con 210
+      if (bottomLeftTile === 214) {
+        groundLayer.putTileAt(210, left + 1, bottom);
       }
-      // Se il corner è diventato 73 e right,bottom-1 è stato sporcato dal BOTTOM_BODY
+      // Se il corner è diventato 194 (door interna a right-1), rimpiazzare anche quel door con 212
+      if (bottomRightTile === 194) {
+        groundLayer.putTileAt(212, right - 1, bottom);
+      }
+      // Se il corner è diventato 194 e right,bottom-1 è stato sporcato dal BOTTOM_BODY
       // (porta sul bordo inferiore con ultimo tile a x=right), ripristinare la parete destra.
       // Guard: se right,bottom-2 NON è bloccato, il 42 a right,bottom-1 è spillover di BOTTOM_BODY
       // (non un'apertura di porta RIGHT che coprirebbe anche bottom-2).
-      if (bottomRightTile === 73 && !blockedDoorTiles.has(`${right},${bottom - 2}`)) {
+      if (bottomRightTile === 194 && !blockedDoorTiles.has(`${right},${bottom - 2}`)) {
         groundLayer.putTileAt(TILES.WALL.RIGHT[0].index as number, right, bottom - 1);
       }
 
@@ -372,16 +448,7 @@ export class DungeonGenerator {
     const occupiedRooms = new Set<string>();
     const occupiedTiles = new Set<string>();
 
-    // Configurable stairs placement (defaults to end room).
-    const stairsRole = config.placement?.stairs?.roomRole ?? "end";
-    const stairsTile = config.placement?.stairs?.tileIndex ?? TILES.STAIRS;
-    const stairsCandidates = Phaser.Utils.Array.Shuffle(getRoomsByRole(stairsRole).slice()) as Room[];
-    const stairsRoom = stairsCandidates[0] ?? endRoom;
-    stuffLayer.putTileAt(stairsTile, stairsRoom.centerX, stairsRoom.centerY);
-    occupiedRooms.add(roomKey(stairsRoom));
-    occupiedTiles.add(tileKey(stairsRoom.centerX, stairsRoom.centerY));
-
-    // Configurable object placement with defaults equivalent to previous chest behavior.
+    // Scale disabilitate. Placement oggetti attivo.
     const objectRules = config.placement?.objects ?? [];
 
     for (const rule of objectRules) {
@@ -493,7 +560,7 @@ export class DungeonGenerator {
           tryPlaceInRoom(room, true);
         }
       }
-    }
+      }
 
     stuffLayer.setCollisionByExclusion([-1, ...TILES.FLOOR_INDICES]);
 

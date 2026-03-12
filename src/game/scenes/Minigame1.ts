@@ -21,6 +21,7 @@ type WireState = {
   targetSide: Side;
   socketA: SocketData;
   socketB: SocketData;
+  activeTarget: SocketData;
 };
 
 type SocketData = {
@@ -72,6 +73,8 @@ export default class Minigame1 extends Phaser.Scene {
   // UI
   private alertText?: Phaser.GameObjects.Text;
   private alertBg?: Phaser.GameObjects.Rectangle;
+  private draggingWire?: WireState;
+  private draggingPointerId?: number;
 
   constructor() {
     super("Minigame1");
@@ -95,6 +98,16 @@ export default class Minigame1 extends Phaser.Scene {
     this.createHeaderTexts();
     this.createAlerts();
     this.createSocketsAndWires();
+
+    this.input.on("pointermove", this.onPointerMove, this);
+    this.input.on("pointerup", this.onPointerUp, this);
+    this.input.on("pointerupoutside", this.onPointerUp, this);
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.input.off("pointermove", this.onPointerMove, this);
+      this.input.off("pointerup", this.onPointerUp, this);
+      this.input.off("pointerupoutside", this.onPointerUp, this);
+    });
   }
 
   // ─── Layout ─────────────────────────────────────────────────────────────────
@@ -134,7 +147,7 @@ export default class Minigame1 extends Phaser.Scene {
       .text(
         this.boardX,
         this.boardY - this.boardH / 2 - this.s(18),
-        "SYSTEM HACKING",
+        "CROSS-WIRE BREACH",
         {
           fontFamily: "Pixelify Sans",
           fontSize: `${titleSize}px`,
@@ -173,7 +186,7 @@ export default class Minigame1 extends Phaser.Scene {
         }
       )
       .setOrigin(0.5)
-      .setAlpha(0);
+      .setAlpha(1);
 
     const targets = [hintBg, hintText];
     this.tweens.add({ targets, alpha: 1, duration: 1250, ease: "Sine.Out" });
@@ -301,6 +314,165 @@ const hPos = [
     return Array.from({ length: count }, (_, i) => origin + i * step);
   }
 
+  private buildSocketPlan(
+    slotsFactory: () => number[],
+    sidePoints: {
+      left: { x: number; y: number }[];
+      right: { x: number; y: number }[];
+      top: { x: number; y: number }[];
+      bottom: { x: number; y: number }[];
+    }
+  ): { leftSlots: number[]; rightSlots: number[]; topSlots: number[]; bottomSlots: number[] } {
+    let best: { leftSlots: number[]; rightSlots: number[]; topSlots: number[]; bottomSlots: number[] } | null = null;
+    let bestScore = Number.POSITIVE_INFINITY;
+
+    for (let attempt = 0; attempt < 280; attempt++) {
+      const leftSlots = slotsFactory();
+      const topSlots = slotsFactory();
+      const rightSlots = this.findSafePermutation([0, 1, 2, 3, 4], leftSlots, "left", "right", sidePoints);
+      const bottomSlots = this.findSafePermutation([0, 1, 2, 3, 4], topSlots, "top", "bottom", sidePoints);
+
+      const scoreA = this.socketCollisionScore(rightSlots, leftSlots, "left", "right", sidePoints);
+      const scoreB = this.socketCollisionScore(bottomSlots, topSlots, "top", "bottom", sidePoints);
+      const mixedEnough =
+        this.mismatchCount(rightSlots, leftSlots) >= 2 &&
+        this.mismatchCount(bottomSlots, topSlots) >= 2;
+      const totalScore = scoreA + scoreB + (mixedEnough ? 0 : 1000);
+
+      if (totalScore < bestScore) {
+        bestScore = totalScore;
+        best = {
+          leftSlots: [...leftSlots],
+          rightSlots: [...rightSlots],
+          topSlots: [...topSlots],
+          bottomSlots: [...bottomSlots],
+        };
+      }
+
+      if (scoreA === 0 && scoreB === 0 && mixedEnough) {
+        return { leftSlots, rightSlots, topSlots, bottomSlots };
+      }
+    }
+
+    return best ?? {
+      leftSlots: [0, 1, 2, 3, 4],
+      rightSlots: [1, 2, 3, 4, 0],
+      topSlots: [0, 1, 2, 3, 4],
+      bottomSlots: [2, 3, 4, 0, 1],
+    };
+  }
+
+  private mismatchCount(a: number[], b: number[]): number {
+    let count = 0;
+    const n = Math.min(a.length, b.length);
+    for (let i = 0; i < n; i++) {
+      if (a[i] !== b[i]) count++;
+    }
+    return count;
+  }
+
+  private findSafePermutation(
+    targetIndices: number[],
+    sourceIndices: number[],
+    sourceSide: Side,
+    targetSide: Side,
+    sidePoints: {
+      left: { x: number; y: number }[];
+      right: { x: number; y: number }[];
+      top: { x: number; y: number }[];
+      bottom: { x: number; y: number }[];
+    }
+  ): number[] {
+    const base = [...targetIndices];
+    let fallback = [...base];
+    let fallbackScore = Number.POSITIVE_INFINITY;
+
+    for (let attempt = 0; attempt < 220; attempt++) {
+      const candidate = Phaser.Utils.Array.Shuffle([...base]) as number[];
+      const score = this.socketCollisionScore(candidate, sourceIndices, sourceSide, targetSide, sidePoints);
+      if (score < fallbackScore) {
+        fallbackScore = score;
+        fallback = [...candidate];
+      }
+      if (score === 0) return candidate;
+    }
+
+    return fallback;
+  }
+
+  private socketCollisionScore(
+    candidateTargets: number[],
+    sourceIndices: number[],
+    sourceSide: Side,
+    targetSide: Side,
+    sidePoints: {
+      left: { x: number; y: number }[];
+      right: { x: number; y: number }[];
+      top: { x: number; y: number }[];
+      bottom: { x: number; y: number }[];
+    }
+  ): number {
+    const allSockets = [
+      ...sidePoints.left,
+      ...sidePoints.right,
+      ...sidePoints.top,
+      ...sidePoints.bottom,
+    ];
+
+    let collisions = 0;
+    const hitRadius = this.s(22);
+
+    for (let i = 0; i < sourceIndices.length; i++) {
+      const a = sidePoints[sourceSide][sourceIndices[i]];
+      const b = sidePoints[targetSide][candidateTargets[i]];
+      const curvePts = this.buildPreviewCurve(a.x, a.y, b.x, b.y, sourceSide, targetSide).getPoints(44);
+
+      for (const s of allSockets) {
+        const isEndpoint = (Math.abs(s.x - a.x) < 0.1 && Math.abs(s.y - a.y) < 0.1)
+          || (Math.abs(s.x - b.x) < 0.1 && Math.abs(s.y - b.y) < 0.1);
+        if (isEndpoint) continue;
+
+        for (let p = 0; p < curvePts.length; p += 2) {
+          if (Phaser.Math.Distance.Between(curvePts[p].x, curvePts[p].y, s.x, s.y) < hitRadius) {
+            collisions++;
+            break;
+          }
+        }
+      }
+    }
+
+    return collisions;
+  }
+
+  private buildPreviewCurve(
+    ax: number,
+    ay: number,
+    bx: number,
+    by: number,
+    anchorSide: Side,
+    targetSide: Side
+  ): Phaser.Curves.CubicBezier {
+    const cp = this.s(CABLE_CP1);
+    const V2 = Phaser.Math.Vector2;
+
+    const cpDir = (side: Side): { ox: number; oy: number } => {
+      if (side === "left") return { ox: cp, oy: 0 };
+      if (side === "right") return { ox: -cp, oy: 0 };
+      if (side === "top") return { ox: 0, oy: cp };
+      return { ox: 0, oy: -cp };
+    };
+
+    const d1 = cpDir(anchorSide);
+    const d2 = cpDir(targetSide);
+
+    return new Phaser.Curves.CubicBezier(
+      new V2(ax, ay),
+      new V2(ax + d1.ox, ay + d1.oy),
+      new V2(bx + d2.ox, by + d2.oy),
+      new V2(bx, by)
+    );
+  }
+
   private createSocket(x: number, y: number, color: WireColor, side: Side, isRevealed = false): SocketData {
     const container = this.add.container(x, y);
     const gfx = this.add.graphics();
@@ -331,6 +503,7 @@ const hPos = [
       anchorSide: socketA.side,
       targetSide: socketB.side,
       socketA, socketB,
+      activeTarget: socketB,
     };
 
     this.wires.push(state);
@@ -343,7 +516,18 @@ const hPos = [
       this.screenY - this.screenH / 2 + this.screenH * 0.05,
       this.screenY + this.screenH / 2 - this.screenH * 0.05);
 
-    plug.on("dragstart", () => { if (!state.connected) plug.setScale(1.06); });
+    plug.on("dragstart", () => {
+      if (!state.connected) {
+        state.activeTarget = state.socketB;
+        state.anchorX = state.socketA.x;
+        state.anchorY = state.socketA.y;
+        state.anchorSide = state.socketA.side;
+        state.targetSide = state.socketB.side;
+        this.drawPlugGraphic(state.plugGfx, state.color.hex, state.anchorSide, true, true);
+        plug.setVisible(false);
+        plug.setScale(1.06);
+      }
+    });
 
     plug.on("drag", (_p: Phaser.Input.Pointer, dx: number, dy: number) => {
       if (state.connected) return;
@@ -358,6 +542,71 @@ const hPos = [
       plug.setScale(1);
       this.tryConnect(state);
     });
+
+    const socketGrabSize = this.s(88);
+    const makeGrabZone = (socket: SocketData, fromTarget: boolean) => {
+      const zone = this.add.zone(socket.x, socket.y, socketGrabSize, socketGrabSize).setOrigin(0.5);
+      zone.setInteractive({ useHandCursor: true });
+      zone.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+        this.beginSocketDrag(state, fromTarget, pointer);
+      });
+    };
+
+    makeGrabZone(socketA, false);
+    makeGrabZone(socketB, true);
+  }
+
+  private beginSocketDrag(wire: WireState, fromTarget: boolean, pointer: Phaser.Input.Pointer): void {
+    const source = fromTarget ? wire.socketB : wire.socketA;
+    const target = fromTarget ? wire.socketA : wire.socketB;
+    if (!source.isRevealed) return;
+
+    wire.connected = false;
+    wire.activeGlow = false;
+    wire.anchorX = source.x;
+    wire.anchorY = source.y;
+    wire.anchorSide = source.side;
+    wire.targetSide = target.side;
+    wire.activeTarget = target;
+    wire.freeX = source.x;
+    wire.freeY = source.y;
+    wire.plug.setPosition(wire.freeX, wire.freeY);
+    wire.plug.setVisible(false);
+    wire.plug.setScale(1.06);
+    this.drawPlugGraphic(wire.plugGfx, wire.color.hex, source.side, true, true);
+    this.redrawCable(wire);
+
+    this.draggingWire = wire;
+    this.draggingPointerId = pointer.id;
+  }
+
+  private onPointerMove(pointer: Phaser.Input.Pointer): void {
+    if (!this.draggingWire) return;
+    if (this.draggingPointerId != null && pointer.id !== this.draggingPointerId) return;
+
+    this.draggingWire.freeX = Phaser.Math.Clamp(
+      pointer.worldX,
+      this.screenX - this.screenW / 2 + this.screenW * 0.04,
+      this.screenX + this.screenW / 2 - this.screenW * 0.04
+    );
+    this.draggingWire.freeY = Phaser.Math.Clamp(
+      pointer.worldY,
+      this.screenY - this.screenH / 2 + this.screenH * 0.05,
+      this.screenY + this.screenH / 2 - this.screenH * 0.05
+    );
+    this.draggingWire.plug.setPosition(this.draggingWire.freeX, this.draggingWire.freeY);
+    this.redrawCable(this.draggingWire);
+  }
+
+  private onPointerUp(pointer: Phaser.Input.Pointer): void {
+    if (!this.draggingWire) return;
+    if (this.draggingPointerId != null && pointer.id !== this.draggingPointerId) return;
+
+    const wire = this.draggingWire;
+    wire.plug.setScale(1);
+    this.tryConnect(wire);
+    this.draggingWire = undefined;
+    this.draggingPointerId = undefined;
   }
 
   // ─── Graphics ───────────────────────────────────────────────────────────────
@@ -407,7 +656,8 @@ const hPos = [
     g: Phaser.GameObjects.Graphics,
     color: WireColor,
     side: Side,
-    isLit: boolean
+    isLit: boolean,
+    showArm = false
   ) {
     g.clear();
     const c = isLit ? color.hex : 0x6c7687;
@@ -420,8 +670,10 @@ const hPos = [
     g.lineStyle(2, 0xffffff, isLit ? 0.22 : 0.10);
     g.strokeCircle(0, 0, this.s(8));
 
-    const { axis, dir } = this.armConfig(side);
-    this.drawArm(g, c, this.s(30), axis, dir);
+    if (showArm) {
+      const { axis, dir } = this.armConfig(side);
+      this.drawArm(g, c, this.s(30), axis, dir);
+    }
   }
 
   private drawPlugGraphic(
@@ -576,13 +828,13 @@ const hPos = [
 }
 
   private returnWire(wire: WireState) {
-    const fromX = wire.plug.x;
-    const fromY = wire.plug.y;
+    const fromX = wire.plug.x ?? wire.anchorX;
+    const fromY = wire.plug.y ?? wire.anchorY;
 
     this.tweens.addCounter({
       from: 0, to: 1, duration: 220,
       onUpdate: tween => {
-        const t = tween.getValue();
+        const t = tween.getValue() ?? 0;
         wire.freeX = Phaser.Math.Linear(fromX, wire.anchorX, t);
         wire.freeY = Phaser.Math.Linear(fromY, wire.anchorY, t);
         wire.plug.setPosition(wire.freeX, wire.freeY);
@@ -592,6 +844,8 @@ const hPos = [
         wire.freeX = wire.anchorX;
         wire.freeY = wire.anchorY;
         wire.plug.setPosition(wire.anchorX, wire.anchorY);
+        wire.plug.setVisible(true);
+        this.drawPlugGraphic(wire.plugGfx, wire.color.hex, wire.anchorSide, true, false);
         this.redrawCable(wire);
       },
     });
@@ -713,34 +967,10 @@ const hPos = [
     [[0.03, 0.03, 0.025, 0.02], [0.03, 0.055, 0.012, 0.02]].forEach(([rx, ry, rw, rh]) =>
       deco.strokeRect(sx + this.screenW * rx, sy + this.screenH * ry, this.screenW * rw, this.screenH * rh)
     );
-    [[1 - 0.045, 0.03, 0.018, 0.02], [1 - 0.038, 0.055, 0.012, 0.02]].forEach(([rx, ry, rw, rh]) =>
+    [[1 - 0.03 - 0.025, 0.03, 0.025, 0.02], [1 - 0.03 - 0.012, 0.055, 0.012, 0.02]].forEach(([rx, ry, rw, rh]) =>
       deco.strokeRect(sx + this.screenW * rx, sy + this.screenH * ry, this.screenW * rw, this.screenH * rh)
     );
 
-    // Circuit corridor lines
-    const cor = this.add.graphics();
-    cor.lineStyle(Math.max(2, this.s(3)), 0xff73ef, 0.32);
-    ([[-0.11, -0.33, -0.02, 0.01], [0.11, -0.33, 0.02, 0.01]] as [number,number,number,number][])
-      .forEach(([x1, y1, x2, y2]) => {
-        cor.beginPath();
-        cor.moveTo(this.screenX + this.screenW * x1, this.screenY + this.screenH * y1);
-        cor.lineTo(this.screenX + this.screenW * x2, this.screenY + this.screenH * y2);
-        cor.strokePath();
-      });
-    cor.lineStyle(Math.max(2, this.s(3)), 0x43f6ff, 0.32);
-    cor.beginPath();
-    cor.moveTo(this.screenX - this.screenW * 0.085, this.screenY + this.screenH * 0.31);
-    cor.lineTo(this.screenX - this.screenW * 0.02,  this.screenY + this.screenH * 0.01);
-    cor.lineTo(this.screenX + this.screenW * 0.02,  this.screenY + this.screenH * 0.01);
-    cor.lineTo(this.screenX + this.screenW * 0.085, this.screenY + this.screenH * 0.31);
-    cor.strokePath();
-    cor.lineStyle(2, 0x7efcff, 0.35);
-    cor.strokeRoundedRect(
-      this.screenX - this.screenW * 0.018,
-      this.screenY - this.screenH * 0.005,
-      this.screenW * 0.036,
-      this.screenH * 0.03,
-      this.s(4)
-    );
+    // Intentionally left clean: no central corridor pattern behind sockets/wires.
   }
 }

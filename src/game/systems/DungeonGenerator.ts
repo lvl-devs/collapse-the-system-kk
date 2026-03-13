@@ -82,6 +82,7 @@ export interface DungeonConfig {
         orientation?: "horizontal" | "vertical" | "auto";
       };
       roomRoles?: DungeonRoomRole[];
+      roomIds?: string[];
       chancePerRoom?: number;
       minCount?: number;
       maxCount?: number;
@@ -170,6 +171,7 @@ export class DungeonGenerator {
       (dungeon as any).rooms = [];
       config.fixedRooms.forEach(fr => {
         const room = {
+          id: fr.id,
           x: fr.x,
           y: fr.y,
           width: fr.width,
@@ -566,9 +568,20 @@ export class DungeonGenerator {
 
     for (const rule of objectRules) {
       const roles = rule.roomRoles && rule.roomRoles.length > 0 ? rule.roomRoles : (["other"] as DungeonRoomRole[]);
-      const candidateRooms = Phaser.Utils.Array.Shuffle(
-        roles.flatMap((role) => getRoomsByRole(role))
-      ) as Room[];
+      let candidateRooms: Room[] = [];
+      
+      if (rule.roomIds && rule.roomIds.length > 0) {
+        // Find rooms by ID
+        rule.roomIds.forEach(roomId => {
+          const room = (dungeon as any).rooms.find((r: any) => (r as any).id === roomId);
+          if (room) candidateRooms.push(room);
+        });
+      } else {
+        // Fallback to roles
+        candidateRooms = roles.flatMap((role) => getRoomsByRole(role));
+      }
+
+      candidateRooms = Phaser.Utils.Array.Shuffle(candidateRooms) as Room[];
 
       const maxCount = Math.max(0, rule.maxCount ?? Number.MAX_SAFE_INTEGER);
       const minCount = Math.max(0, rule.minCount ?? 0);
@@ -677,53 +690,8 @@ export class DungeonGenerator {
 
     stuffLayer.setCollisionByExclusion([-1, ...TILES.FLOOR_INDICES]);
 
-    // Apply generic overlay rules (driven by JSON)
-    if (config.overlayRules && config.overlayRules.length > 0) {
-      const ruleState = config.overlayRules.map(() => ({ alternateIndex: 0 }));
-      
-      const applyOverlay = (tile: Phaser.Tilemaps.Tile, rule: OverlayRule, idx: number) => {
-        if (rule.onTiles.includes(tile.index)) {
-          if (Phaser.Math.Between(0, 100) < rule.chance) {
-            const state = ruleState[idx];
-            const tsKeys = Array.isArray(rule.tilesets) ? rule.tilesets : [rule.tilesets];
-            const tsKey = rule.alternate 
-              ? tsKeys[state.alternateIndex % tsKeys.length]
-              : Phaser.Utils.Array.GetRandom(tsKeys);
-            
-            if (rule.alternate) state.alternateIndex++;
-
-            const ts = overlayTilesets[tsKey];
-            if (ts) {
-              let frameOffset = 0;
-              if (rule.frameMapping) {
-                const mapped = rule.frameMapping[tile.index];
-                if (mapped !== undefined) frameOffset = mapped;
-              }
-              stuffLayer.putTileAt(ts.firstgid + frameOffset, tile.x, tile.y);
-            }
-          }
-        }
-      };
-
-      config.overlayRules.forEach((rule, idx) => {
-        if (rule.roomIds && rule.roomIds.length > 0) {
-          // Rule is specific to certain rooms
-          rule.roomIds.forEach(roomId => {
-            const roomConfig = config.fixedRooms?.find(r => r.id === roomId);
-            if (roomConfig) {
-              groundLayer.forEachTile((tile) => {
-                applyOverlay(tile, rule, idx);
-              }, undefined, roomConfig.x, roomConfig.y, roomConfig.width, roomConfig.height);
-            }
-          });
-        } else {
-          // Rule applies globally
-          groundLayer.forEachTile((tile) => {
-            applyOverlay(tile, rule, idx);
-          });
-        }
-      });
-    }
+    // Generic overlay rules (driven by JSON)
+    this.applyOverlayRules(config, dungeon, groundLayer, stuffLayer, overlayTilesets, blockedDoorTiles);
 
     // Calculate spawn position and setup camera/physics bounds
     const startX = (map.tileToWorldX(startRoom.centerX) ?? 0) + tileSize / 2;
@@ -732,7 +700,80 @@ export class DungeonGenerator {
     scene.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
     scene.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
 
+    // Final collision update for everything on stuff layer
+    stuffLayer.setCollisionByExclusion([-1, ...TILES.FLOOR_INDICES]);
+
     return { map, groundLayer, stuffLayer, dungeon, startRoom, endRoom, otherRooms, startX, startY };
+  }
+
+  private static applyOverlayRules(
+    config: DungeonConfig,
+    dungeon: any,
+    groundLayer: Phaser.Tilemaps.TilemapLayer,
+    stuffLayer: Phaser.Tilemaps.TilemapLayer,
+    overlayTilesets: Record<string, Phaser.Tilemaps.Tileset>,
+    blockedDoorTiles: Set<string>
+  ): void {
+    if (!config.overlayRules || config.overlayRules.length === 0) return;
+
+    const ruleState = config.overlayRules.map(() => ({ alternateIndex: 0 }));
+
+    const applyOverlay = (tile: Phaser.Tilemaps.Tile, rule: any, idx: number) => {
+      if (blockedDoorTiles.has(`${tile.x},${tile.y}`)) return;
+
+      if (rule.onTiles.includes(tile.index)) {
+        // Check if there's already an object here to avoid overwriting
+        const existing = stuffLayer.getTileAt(tile.x, tile.y);
+        if (existing && existing.index !== -1) return;
+
+        if (Phaser.Math.Between(0, 100) < rule.chance) {
+          const state = ruleState[idx];
+          const tsKeys = Array.isArray(rule.tilesets) ? rule.tilesets : [rule.tilesets];
+          const tsKey = rule.alternate
+            ? tsKeys[state.alternateIndex % tsKeys.length]
+            : Phaser.Utils.Array.GetRandom(tsKeys);
+
+          if (rule.alternate) state.alternateIndex++;
+
+          const ts = overlayTilesets[tsKey];
+          if (ts) {
+            let frameOffset = 0;
+            if (rule.frameMapping) {
+              const mapped = rule.frameMapping[tile.index];
+              if (mapped !== undefined) frameOffset = mapped;
+            }
+            const overlayTile = stuffLayer.putTileAt(ts.firstgid + frameOffset, tile.x, tile.y);
+            
+            // Mark for collision if specified in the rule
+            if (rule.collision && overlayTile) {
+               // We will update collision for the whole layer at the end of buildTilemap
+            }
+          }
+        }
+      }
+    };
+
+    config.overlayRules.forEach((rule, idx) => {
+      if (rule.roomIds && rule.roomIds.length > 0) {
+        // Rule is specific to certain rooms
+        rule.roomIds.forEach(roomId => {
+          // Flexible room lookup (works for both fixed and procedural if IDs are assigned correctly)
+          const roomConfig = dungeon.rooms?.find((r: any) => r.id === roomId)
+            || config.fixedRooms?.find(r => r.id === roomId);
+
+          if (roomConfig) {
+            groundLayer.forEachTile((tile) => {
+              applyOverlay(tile, rule, idx);
+            }, undefined, roomConfig.x, roomConfig.y, roomConfig.width, roomConfig.height);
+          }
+        });
+      } else {
+        // Rule applies globally
+        groundLayer.forEachTile((tile) => {
+          applyOverlay(tile, rule, idx);
+        });
+      }
+    });
   }
 
   private static pickRoomPlacementTiles(

@@ -119,50 +119,11 @@ export const GameData: GameDataType = {
       fixedRooms: dungeonLayout.fixedRooms as any,
       fixedCorridors: dungeonLayout.corridors as any,
       overlayRules: (dungeonLayout as any).overlayRules,
-      placement: {
+      placement: (dungeonLayout as any).placement || {
         stairs: {
           roomRole: "end",
         },
-        /* objects: [
-          {
-            id: "chairs",
-            tileIndex: 52,
-            tileVariants: [
-              {
-                base: 52,
-                byWall: {
-                  top: 52,
-                  left: 73,
-                  right: 94,
-                  bottom: 115
-                },
-              },
-              {
-                base: 53,
-                byWall: {
-                  top: 53,
-                  left: 74,
-                  right: 95,
-                  bottom: 116 
-                },
-              },
-            ],
-            roomRoles: ["other"],
-            chancePerRoom: 0.7,
-            countPerRoom: {
-              min: 3,
-              max: 5,
-            },
-            position: {
-              mode: "wallAttached",
-              wallSides: ["top", "left", "right"],
-              avoidCenter: true,
-              paddingFromWalls: 1,
-            },
-            avoidOccupiedRooms: false,
-            avoidOccupiedTiles: true,
-          },
-        ], */
+        objects: []
       },
     },
   },

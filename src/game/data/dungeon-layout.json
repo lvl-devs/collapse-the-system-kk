@@ -13,26 +13,46 @@
     { "from": "center", "to": "right",  "type": "horizontal" },
     { "from": "center", "to": "up",     "type": "vertical" }
   ],
+  "placement": {
+    "stairs": { "roomRole": "end" },
+    "objects": [
+      {
+        "id": "chairs-left",
+        "tileIndex": 73,
+        "tileVariants": [
+          { "base": 73, "byWall": { "left": 73 } },
+          { "base": 74, "byWall": { "left": 74 } }
+        ],
+        "roomIds": ["center"],
+        "chancePerRoom": 0.8,
+        "countPerRoom": { "min": 2, "max": 4 },
+        "position": { "mode": "wallAttached", "wallSides": ["left"] }
+      },
+      {
+        "id": "chairs-right",
+        "tileIndex": 94,
+        "tileVariants": [
+          { "base": 94, "byWall": { "right": 94 } },
+          { "base": 95, "byWall": { "right": 95 } }
+        ],
+        "roomIds": ["left", "right"],
+        "chancePerRoom": 0.5,
+        "countPerRoom": { "min": 1, "max": 2 },
+        "position": { "mode": "wallAttached", "wallSides": ["right"] }
+      }
+    ]
+  },
   "overlayRules": [
     {
-      "id": "server-racks-left",
-      "tilesets": "server-rack-open",
+      "id": "server-racks",
+      "tilesets": ["server-rack-open", "server-rack-closed"],
       "onTiles": [23, 24, 25, 55, 56, 76, 77, 97, 98],
       "chance": 80,
-      "alternate": false,
+      "alternate": true,
       "tileHeight": 64,
       "tileOffset": { "x": 0, "y": 16 },
-      "roomIds": ["left"]
-    },
-    {
-      "id": "server-racks-right",
-      "tilesets": "server-rack-closed",
-      "onTiles": [23, 24, 25, 55, 56, 76, 77, 97, 98],
-      "chance": 80,
-      "alternate": false,
-      "tileHeight": 64,
-      "tileOffset": { "x": 0, "y": 16 },
-      "roomIds": ["right"]
+      "roomIds": ["left", "right"],
+      "collision": true
     }
   ]
 }

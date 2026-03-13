@@ -132,13 +132,58 @@ export default class GamePlay extends Phaser.Scene {
     this.dungeonResult.otherRooms.forEach(room => {
       const walls: DungeonWallSide[] = ["top", "bottom", "left", "right"];
       const wall = Phaser.Utils.Array.GetRandom(walls);
-      
-      let tx = room.centerX;
-      let ty = room.centerY;
-      if (wall === "top") ty = room.top + 1;
-      else if (wall === "bottom") ty = room.bottom;
-      else if (wall === "left") tx = room.left;
-      else if (wall === "right") tx = room.right;
+
+      const isValidCameraTile = (tx: number, ty: number): boolean => {
+        const tile = groundLayer.getTileAt(tx, ty);
+        return !!tile && tile.index !== 42 && tile.collides;
+      };
+
+      const candidateTiles: Array<{ tx: number; ty: number }> = [];
+      if (wall === "top") {
+        for (let tx = room.left + 1; tx <= room.right - 1; tx++) {
+          if (isValidCameraTile(tx, room.top)) {
+            candidateTiles.push({ tx, ty: room.top });
+          }
+        }
+      } else if (wall === "bottom") {
+        for (let tx = room.left + 1; tx <= room.right - 1; tx++) {
+          if (isValidCameraTile(tx, room.bottom)) {
+            candidateTiles.push({ tx, ty: room.bottom });
+          }
+        }
+      } else if (wall === "left") {
+        for (let ty = room.top + 2; ty <= room.bottom - 1; ty++) {
+          if (isValidCameraTile(room.left, ty)) {
+            candidateTiles.push({ tx: room.left, ty });
+          }
+        }
+      } else if (wall === "right") {
+        for (let ty = room.top + 2; ty <= room.bottom - 1; ty++) {
+          if (isValidCameraTile(room.right, ty)) {
+            candidateTiles.push({ tx: room.right, ty });
+          }
+        }
+      }
+
+      // Fallback: if the chosen side has no valid wall tile, use any valid perimeter wall tile.
+      if (candidateTiles.length === 0) {
+        for (let tx = room.left; tx <= room.right; tx++) {
+          if (isValidCameraTile(tx, room.top)) candidateTiles.push({ tx, ty: room.top });
+          if (isValidCameraTile(tx, room.bottom)) candidateTiles.push({ tx, ty: room.bottom });
+        }
+        for (let ty = room.top; ty <= room.bottom; ty++) {
+          if (isValidCameraTile(room.left, ty)) candidateTiles.push({ tx: room.left, ty });
+          if (isValidCameraTile(room.right, ty)) candidateTiles.push({ tx: room.right, ty });
+        }
+      }
+
+      if (candidateTiles.length === 0) {
+        return;
+      }
+
+      const spawnTile = Phaser.Utils.Array.GetRandom(candidateTiles);
+      const tx = spawnTile.tx;
+      const ty = spawnTile.ty;
 
       const cx = (map.tileToWorldX(tx) ?? 0) + map.tileWidth / 2;
       const cy = (map.tileToWorldY(ty) ?? 0) + map.tileHeight / 2;

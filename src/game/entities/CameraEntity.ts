@@ -39,8 +39,8 @@ export default class CameraEntity extends Phaser.GameObjects.Container {
     else if (wall === "left") baseAngle = 0;
     else if (wall === "right") baseAngle = 180;
 
-    this.minAngle = Phaser.Math.DegToRad(baseAngle - 45);
-    this.maxAngle = Phaser.Math.DegToRad(baseAngle + 45);
+    this.minAngle = Phaser.Math.DegToRad(baseAngle - 135);
+    this.maxAngle = Phaser.Math.DegToRad(baseAngle + 135);
     this.currentAngle = this.minAngle;
     this.rotationSpeed = 0.5; // rad per sec
 

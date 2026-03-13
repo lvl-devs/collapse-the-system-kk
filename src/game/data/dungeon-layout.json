@@ -13,6 +13,14 @@
     { "from": "center", "to": "right",  "type": "horizontal" },
     { "from": "center", "to": "up",     "type": "vertical" }
   ],
+  "doors": {
+    "placement": "corridorEntrances",
+    "centralTileset": "door-closed",
+    "sideTileset": "door",
+    "tileWidth": 64,
+    "tileHeight": 64,
+    "tileOffset": { "x": 0, "y": 0 }
+  },
   "placement": {
     "stairs": { "roomRole": "end" },
     "objects": [

@@ -63,6 +63,14 @@ export interface DungeonConfig {
     to: string;
     type: "horizontal" | "vertical";
   }>;
+  doors?: {
+    placement?: "corridorEntrances" | "roomEntrances" | "none";
+    centralTileset?: string;
+    sideTileset?: string;
+    tileWidth?: number;
+    tileHeight?: number;
+    tileOffset?: { x?: number; y: number };
+  };
   overlayRules?: OverlayRule[];
   placement?: {
     stairs?: {
@@ -106,6 +114,7 @@ export interface DungeonBuildResult {
   map: Phaser.Tilemaps.Tilemap;
   groundLayer: Phaser.Tilemaps.TilemapLayer;
   stuffLayer: Phaser.Tilemaps.TilemapLayer;
+  doorLayer: Phaser.Tilemaps.TilemapLayer;
   dungeon: Dungeon;
   startRoom: Room;
   endRoom: Room;
@@ -191,29 +200,48 @@ export class DungeonGenerator {
 
     // Load all tilesets specified in overlay rules
     const overlayTilesets: Record<string, Phaser.Tilemaps.Tileset> = {};
+    const ensureOverlayTileset = (tsKey: string, tileHeight: number, tileOffset?: { x?: number; y: number }, tileWidth?: number): void => {
+      if (overlayTilesets[tsKey]) return;
+      const ts = map.addTilesetImage(tsKey, tsKey, tileWidth ?? tileSize, tileHeight, 0, 0);
+      if (!ts) return;
+      overlayTilesets[tsKey] = ts;
+      if (tileOffset) {
+        ts.tileOffset.y = tileOffset.y;
+        ts.tileOffset.x = tileOffset.x || 0;
+      }
+    };
+
     if (config.overlayRules) {
       config.overlayRules.forEach(rule => {
         const tsKeys = Array.isArray(rule.tilesets) ? rule.tilesets : [rule.tilesets];
         tsKeys.forEach(tsKey => {
-          if (!overlayTilesets[tsKey]) {
-            const ts = map.addTilesetImage(tsKey, tsKey, tileSize, rule.tileHeight || tileSize, 0, 0);
-            if (ts) {
-              overlayTilesets[tsKey] = ts;
-              if (rule.tileOffset) {
-                ts.tileOffset.y = rule.tileOffset.y;
-                ts.tileOffset.x = rule.tileOffset.x || 0;
-              }
-            }
-          }
+          ensureOverlayTileset(tsKey, rule.tileHeight || tileSize, rule.tileOffset);
         });
       });
     }
 
+    const centralDoorTilesetKey = config.doors?.centralTileset || "door-closed";
+    const sideDoorTilesetKey = config.doors?.sideTileset || "door";
+    const doorTileWidth = config.doors?.tileWidth ?? tileSize;
+    const doorTileHeight = config.doors?.tileHeight || tileSize * 2;
+    const doorTileOffset = config.doors?.tileOffset || { x: 0, y: 0 };
+
+    // Door overlay tilesets can be enabled via config.doors even without a dedicated overlayRule.
+    if (config.doors?.placement !== "none") {
+      ensureOverlayTileset(centralDoorTilesetKey, doorTileHeight, doorTileOffset, doorTileWidth);
+      ensureOverlayTileset(sideDoorTilesetKey, doorTileHeight, doorTileOffset, doorTileWidth);
+    }
+
     const validOverlayTilesets = Object.values(overlayTilesets).filter(t => t !== null) as Phaser.Tilemaps.Tileset[];
+    const doorOverlayKeys = new Set([centralDoorTilesetKey, sideDoorTilesetKey]);
+    const objectOverlayTilesets = validOverlayTilesets.filter(ts => !doorOverlayKeys.has(ts.name));
+    const doorLayerOverlayTilesets = validOverlayTilesets.filter(ts => doorOverlayKeys.has(ts.name));
 
     // Create layers
     const groundLayer = map.createBlankLayer("Ground", tileset)!.setDepth(0);
-    const stuffLayer = map.createBlankLayer("Stuff", [tileset, ...validOverlayTilesets])!.setDepth(1);
+    const stuffLayer = map.createBlankLayer("Stuff", [tileset, ...objectOverlayTilesets])!.setDepth(1);
+    const doorLayerTilesets = [tileset, ...doorLayerOverlayTilesets];
+    const doorLayer = map.createBlankLayer("Doors", doorLayerTilesets)!.setDepth(2);
     const blockedDoorTiles = new Set<string>();
 
     const markBlocked = (tx: number, ty: number): void => {
@@ -243,54 +271,125 @@ export class DungeonGenerator {
       groundLayer.weightedRandomize(TILES.WALL.RIGHT, right, top + 2, 1, height - 3);
     });
 
-    // Pass 2a: Place ALL doors and mark blocked tiles across every room.
-    // Must run completely before Pass 2b so that adjacency checks see all doors.
-    dungeon.rooms.forEach((room) => {
-      const { x, y, width, height } = room;
+    const hasFixedCorridors = !!(config.fixedCorridors && config.fixedCorridors.length > 0 && config.fixedRooms && config.fixedRooms.length > 0);
+    const doorPlacement = config.doors?.placement ?? (hasFixedCorridors ? "corridorEntrances" : "roomEntrances");
 
-      const doors = room.getDoorLocations();
-      for (const door of doors) {
-        if (door.y === 0) {
-          const startX = x + door.x - 1;
-          const doorY = y + door.y;
+    // Pass 2a: place doorway frames according to the configured placement rule.
+    if (doorPlacement === "corridorEntrances" && hasFixedCorridors) {
+      const fixedCorridors = config.fixedCorridors!;
+      const fixedRooms = config.fixedRooms!;
+
+      const markHorizontalDoor = (startX: number, doorY: number, topDoor: boolean): void => {
+        if (topDoor) {
           groundLayer.putTilesAt(TILES.DOOR.TOP, startX, doorY);
           groundLayer.putTilesAt(TILES.DOOR.TOP_BODY, startX, doorY + 1);
-
           for (let i = 0; i < TILES.DOOR.TOP.length; i++) {
             markBlocked(startX + i, doorY);
             markBlocked(startX + i, doorY + 1);
           }
-        } else if (door.y === height - 1) {
-          const startX = x + door.x - 1;
-          const doorY = y + door.y;
-          groundLayer.putTilesAt(TILES.DOOR.BOTTOM, startX, doorY);
-          groundLayer.putTilesAt(TILES.DOOR.BOTTOM_BODY, startX, doorY - 1);
+          return;
+        }
 
-          for (let i = 0; i < TILES.DOOR.BOTTOM.length; i++) {
-            markBlocked(startX + i, doorY);
-            markBlocked(startX + i, doorY - 1);
-          }
-        } else if (door.x === 0) {
-          const doorX = x + door.x;
-          const startY = y + door.y - 1;
+        groundLayer.putTilesAt(TILES.DOOR.BOTTOM, startX, doorY);
+        groundLayer.putTilesAt(TILES.DOOR.BOTTOM_BODY, startX, doorY - 1);
+        for (let i = 0; i < TILES.DOOR.BOTTOM.length; i++) {
+          markBlocked(startX + i, doorY);
+          markBlocked(startX + i, doorY - 1);
+        }
+      };
+
+      const markVerticalDoor = (doorX: number, startY: number, leftDoor: boolean): void => {
+        if (leftDoor) {
           groundLayer.putTilesAt(TILES.DOOR.LEFT, doorX, startY);
-
           for (let i = 0; i < TILES.DOOR.LEFT.length; i++) {
             markBlocked(doorX, startY + i);
             markBlocked(doorX + 1, startY + i);
           }
-        } else if (door.x === width - 1) {
-          const doorX = x + door.x;
-          const startY = y + door.y - 1;
-          groundLayer.putTilesAt(TILES.DOOR.RIGHT, doorX, startY);
+          return;
+        }
 
-          for (let i = 0; i < TILES.DOOR.RIGHT.length; i++) {
-            markBlocked(doorX, startY + i);
-            markBlocked(doorX - 1, startY + i);
+        groundLayer.putTilesAt(TILES.DOOR.RIGHT, doorX, startY);
+        for (let i = 0; i < TILES.DOOR.RIGHT.length; i++) {
+          markBlocked(doorX, startY + i);
+          markBlocked(doorX - 1, startY + i);
+        }
+      };
+
+      fixedCorridors.forEach((corr) => {
+        const fromRoom = fixedRooms.find(r => r.id === corr.from);
+        const toRoom = fixedRooms.find(r => r.id === corr.to);
+        if (!fromRoom || !toRoom) return;
+
+        if (corr.type === "horizontal") {
+          const corridorY = Math.floor((fromRoom.y + fromRoom.height / 2 + toRoom.y + toRoom.height / 2) / 2);
+          const fromOnLeft = fromRoom.x < toRoom.x;
+          const leftRoom = fromOnLeft ? fromRoom : toRoom;
+          const rightRoom = fromOnLeft ? toRoom : fromRoom;
+
+          // Right wall entrance of left room.
+          markVerticalDoor(leftRoom.x + leftRoom.width - 1, corridorY - 1, false);
+          // Left wall entrance of right room.
+          markVerticalDoor(rightRoom.x, corridorY - 1, true);
+        } else if (corr.type === "vertical") {
+          const corridorX = Math.floor((fromRoom.x + fromRoom.width / 2 + toRoom.x + toRoom.width / 2) / 2);
+          const fromOnTop = fromRoom.y < toRoom.y;
+          const topRoom = fromOnTop ? fromRoom : toRoom;
+          const bottomRoom = fromOnTop ? toRoom : fromRoom;
+
+          // Bottom wall entrance of top room.
+          markHorizontalDoor(corridorX - 1, topRoom.y + topRoom.height - 1, false);
+          // Top wall entrance of bottom room.
+          markHorizontalDoor(corridorX - 1, bottomRoom.y, true);
+        }
+      });
+    } else if (doorPlacement === "roomEntrances") {
+      dungeon.rooms.forEach((room) => {
+        const { x, y, width, height } = room;
+
+        const doors = room.getDoorLocations();
+        for (const door of doors) {
+          if (door.y === 0) {
+            const startX = x + door.x - 1;
+            const doorY = y + door.y;
+            groundLayer.putTilesAt(TILES.DOOR.TOP, startX, doorY);
+            groundLayer.putTilesAt(TILES.DOOR.TOP_BODY, startX, doorY + 1);
+
+            for (let i = 0; i < TILES.DOOR.TOP.length; i++) {
+              markBlocked(startX + i, doorY);
+              markBlocked(startX + i, doorY + 1);
+            }
+          } else if (door.y === height - 1) {
+            const startX = x + door.x - 1;
+            const doorY = y + door.y;
+            groundLayer.putTilesAt(TILES.DOOR.BOTTOM, startX, doorY);
+            groundLayer.putTilesAt(TILES.DOOR.BOTTOM_BODY, startX, doorY - 1);
+
+            for (let i = 0; i < TILES.DOOR.BOTTOM.length; i++) {
+              markBlocked(startX + i, doorY);
+              markBlocked(startX + i, doorY - 1);
+            }
+          } else if (door.x === 0) {
+            const doorX = x + door.x;
+            const startY = y + door.y - 1;
+            groundLayer.putTilesAt(TILES.DOOR.LEFT, doorX, startY);
+
+            for (let i = 0; i < TILES.DOOR.LEFT.length; i++) {
+              markBlocked(doorX, startY + i);
+              markBlocked(doorX + 1, startY + i);
+            }
+          } else if (door.x === width - 1) {
+            const doorX = x + door.x;
+            const startY = y + door.y - 1;
+            groundLayer.putTilesAt(TILES.DOOR.RIGHT, doorX, startY);
+
+            for (let i = 0; i < TILES.DOOR.RIGHT.length; i++) {
+              markBlocked(doorX, startY + i);
+              markBlocked(doorX - 1, startY + i);
+            }
           }
         }
-      }
-    });
+      });
+    }
 
     // Pass 2a-fix: junction corrections using full 8-neighbor context.
     this.applyJunctionFixes(groundLayer, dungeon);
@@ -693,6 +792,9 @@ export class DungeonGenerator {
     // Generic overlay rules (driven by JSON)
     this.applyOverlayRules(config, dungeon, groundLayer, stuffLayer, overlayTilesets, blockedDoorTiles);
 
+    // Passage doors (hallways and room entrances) on dedicated overlay layer.
+    this.applyDoorOverlays(config, doorLayer, overlayTilesets);
+
     // Calculate spawn position and setup camera/physics bounds
     const startX = (map.tileToWorldX(startRoom.centerX) ?? 0) + tileSize / 2;
     const startY = (map.tileToWorldY(startRoom.centerY) ?? 0) + tileSize / 2;
@@ -703,7 +805,7 @@ export class DungeonGenerator {
     // Final collision update for everything on stuff layer
     stuffLayer.setCollisionByExclusion([-1, ...TILES.FLOOR_INDICES]);
 
-    return { map, groundLayer, stuffLayer, dungeon, startRoom, endRoom, otherRooms, startX, startY };
+    return { map, groundLayer, stuffLayer, doorLayer, dungeon, startRoom, endRoom, otherRooms, startX, startY };
   }
 
   private static applyOverlayRules(
@@ -774,6 +876,63 @@ export class DungeonGenerator {
         });
       }
     });
+  }
+
+  private static applyDoorOverlays(
+    config: DungeonConfig,
+    doorLayer: Phaser.Tilemaps.TilemapLayer,
+    overlayTilesets: Record<string, Phaser.Tilemaps.Tileset>
+  ): void {
+    const centralDoorTilesetKey = config.doors?.centralTileset || "door-closed";
+    const sideDoorTilesetKey = config.doors?.sideTileset || "door";
+    const centralDoorTs = overlayTilesets[centralDoorTilesetKey];
+    const sideDoorTs = overlayTilesets[sideDoorTilesetKey];
+    if (!centralDoorTs && !sideDoorTs) return;
+
+    const doorPlacement = config.doors?.placement ?? "corridorEntrances";
+    if (doorPlacement !== "corridorEntrances") return;
+
+    // Doors only at fixed corridor entrances.
+    if (config.fixedCorridors) {
+      config.fixedCorridors.forEach(corr => {
+        const fromRoom = config.fixedRooms?.find(r => r.id === corr.from);
+        const toRoom = config.fixedRooms?.find(r => r.id === corr.to);
+        if (!fromRoom || !toRoom) return;
+
+        const fromCenterX = fromRoom.x + fromRoom.width / 2;
+        const fromCenterY = fromRoom.y + fromRoom.height / 2;
+        const toCenterX = toRoom.x + toRoom.width / 2;
+        const toCenterY = toRoom.y + toRoom.height / 2;
+        const lateralCorridor = Math.abs(fromCenterX - toCenterX) >= Math.abs(fromCenterY - toCenterY);
+
+        if (corr.type === "horizontal") {
+          const doorTs = lateralCorridor ? sideDoorTs : centralDoorTs;
+          if (!doorTs) return;
+          const corridorY = Math.floor((fromRoom.y + fromRoom.height / 2 + toRoom.y + toRoom.height / 2) / 2);
+          const fromOnLeft = fromRoom.x < toRoom.x;
+          const leftRoom = fromOnLeft ? fromRoom : toRoom;
+          const rightRoom = fromOnLeft ? toRoom : fromRoom;
+
+          const leftDoorX = leftRoom.x + leftRoom.width - 1;
+          const rightDoorX = rightRoom.x;
+          doorLayer.putTileAt(doorTs.firstgid, leftDoorX, corridorY);
+          doorLayer.putTileAt(doorTs.firstgid, rightDoorX, corridorY);
+
+        } else if (corr.type === "vertical") {
+          const doorTs = lateralCorridor ? sideDoorTs : centralDoorTs;
+          if (!doorTs) return;
+          const corridorX = Math.floor((fromRoom.x + fromRoom.width / 2 + toRoom.x + toRoom.width / 2) / 2);
+          const fromOnTop = fromRoom.y < toRoom.y;
+          const topRoom = fromOnTop ? fromRoom : toRoom;
+          const bottomRoom = fromOnTop ? toRoom : fromRoom;
+
+          const topDoorY = topRoom.y + topRoom.height - 1;
+          const bottomDoorY = bottomRoom.y;
+          doorLayer.putTileAt(doorTs.firstgid, corridorX, topDoorY);
+          doorLayer.putTileAt(doorTs.firstgid, corridorX, bottomDoorY);
+        }
+      });
+    }
   }
 
   private static pickRoomPlacementTiles(

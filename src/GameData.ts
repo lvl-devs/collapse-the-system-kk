@@ -118,6 +118,7 @@ export const GameData: GameDataType = {
       },
       fixedRooms: dungeonLayout.fixedRooms as any,
       fixedCorridors: dungeonLayout.corridors as any,
+      doors: (dungeonLayout as any).doors,
       overlayRules: (dungeonLayout as any).overlayRules,
       placement: (dungeonLayout as any).placement || {
         stairs: {
@@ -140,6 +141,9 @@ export const GameData: GameDataType = {
     { name: "tileset-void", path: "/tilemaps/home.png" },
     { name: "server-rack-open", path: "/tilemaps/server-rack-open.png" },
     { name: "server-rack-closed", path: "/tilemaps/server-rack-closed.png" },
+    { name: "door", path: "/tilemaps/door.png" },
+    { name: "door-open", path: "/tilemaps/door-open.png" },
+    { name: "door-closed", path: "/tilemaps/door-closed.png" },
   ],
 
   tilemaps: [],

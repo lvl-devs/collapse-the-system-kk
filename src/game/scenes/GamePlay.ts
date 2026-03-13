@@ -1,12 +1,15 @@
 import Phaser from "phaser";
 import { GameData } from "../../GameData";
 import DungeonGenerator from "../systems/DungeonGenerator";
-import type { DungeonBuildResult } from "../systems/DungeonGenerator";
+import type { DungeonBuildResult, DungeonWallSide } from "../systems/DungeonGenerator";
 import AssetPipeline from "../systems/AssetPipeline";
 import MusicManager from "../audio/MusicManager";
 import LevelStorage from "../systems/LevelStorage";
 import { DEFAULT_TILES } from "../systems/TileMapping";
+import Pathfinder from "../systems/Pathfinder";
 import CharacterController, { createKeyboardMovementInput } from "../entities/CharacterController";
+import CameraEntity from "../entities/CameraEntity";
+import ChaserEntity from "../entities/ChaserEntity";
 
 const PLAYER_SPEED = 160;
 
@@ -29,6 +32,12 @@ export default class GamePlay extends Phaser.Scene {
   private currentLevelMusicKey?: string;
   private pausedSfxDuringPause: Phaser.Sound.BaseSound[] = [];
   private isAudioPausedForMenu = false;
+
+  private camerasList: CameraEntity[] = [];
+  private chaser!: ChaserEntity;
+  private pathfinder!: Pathfinder;
+  private hideKey?: Phaser.Input.Keyboard.Key;
+  private barricadePrompt?: Phaser.GameObjects.Text;
 
   constructor() {
     super({ key: "GamePlay" });
@@ -115,10 +124,47 @@ export default class GamePlay extends Phaser.Scene {
 
     this.cameras.main.startFollow(this.playerController.sprite, true, 0.1, 0.1);
 
+    // Initialize Chaser
+    this.chaser = new ChaserEntity(this, startX, startY, "policeman", this.playerController.sprite);
+
+    // Initialize Cameras in other rooms
+    this.camerasList = [];
+    this.dungeonResult.otherRooms.forEach(room => {
+      const walls: DungeonWallSide[] = ["top", "bottom", "left", "right"];
+      const wall = Phaser.Utils.Array.GetRandom(walls);
+      
+      let tx = room.centerX;
+      let ty = room.centerY;
+      if (wall === "top") ty = room.top + 1;
+      else if (wall === "bottom") ty = room.bottom;
+      else if (wall === "left") tx = room.left;
+      else if (wall === "right") tx = room.right;
+
+      const cx = (map.tileToWorldX(tx) ?? 0) + map.tileWidth / 2;
+      const cy = (map.tileToWorldY(ty) ?? 0) + map.tileHeight / 2;
+      
+      // Clip the beam to the full room area (walls included) so the beam apex
+      // stays aligned with wall-mounted cameras and never leaks outside the room.
+      const rx = (map.tileToWorldX(room.left) ?? 0);
+      const ry = (map.tileToWorldY(room.top) ?? 0);
+      const rw = room.width * map.tileWidth;
+      const rh = room.height * map.tileHeight;
+      
+      const roomBounds = new Phaser.Geom.Rectangle(rx, ry, rw, rh);
+
+      const camera = new CameraEntity(this, cx, cy, wall, roomBounds, groundLayer);
+      this.camerasList.push(camera);
+    });
+
     this.escPauseKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
     this.collisionDebugKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.C);
     this.tileOverlayToggleKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.I);
     this.escPauseKey?.on("down", this.openPauseMenu, this);
+
+    this.hideKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.B);
+    this.hideKey?.on("down", this.tryHide, this);
+
+    this.pathfinder = new Pathfinder(groundLayer);
 
     this.add
       .text(16, 16, `Level: ${this.currentLevel}\nESC -> Menu`, {
@@ -142,17 +188,32 @@ export default class GamePlay extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(100);
 
+    this.barricadePrompt = this.add.text(0, 0, "Premi B per bloccare", {
+      fontFamily: GameData.globals.defaultFont.key,
+      fontSize: "12px",
+      color: "#ffffff",
+      backgroundColor: "#aa0000aa",
+      padding: { x: 4, y: 2 }
+    })
+      .setOrigin(0.5, 1)
+      .setDepth(200)
+      .setVisible(false);
+
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.events.off(Phaser.Scenes.Events.PAUSE, this.pauseCurrentLevelAudio, this);
       this.events.off(Phaser.Scenes.Events.RESUME, this.resumeCurrentLevelMusic, this);
       this.escPauseKey?.off("down", this.openPauseMenu, this);
+      this.hideKey?.off("down", this.tryHide, this);
       this.escPauseKey = undefined;
+      this.hideKey = undefined;
       this.collisionDebugKey = undefined;
       this.tileOverlayToggleKey = undefined;
       this.tileOverlayObjects.forEach(o => o.destroy());
       this.tileOverlayObjects = [];
       this.hoverInfoPanel?.destroy();
       this.hoverInfoPanel = undefined;
+      this.barricadePrompt?.destroy();
+      this.barricadePrompt = undefined;
       this.input.off("pointermove", this.onTileHover, this);
       this.input.off("pointerdown", this.onTileCopy, this);
     });
@@ -176,6 +237,121 @@ export default class GamePlay extends Phaser.Scene {
     }
 
     this.playerController.update();
+
+    const dt = this.game.loop.delta;
+    
+    // Update cameras
+    let detected = false;
+    for (const cam of this.camerasList) {
+      cam.update(dt);
+      if (cam.detectsTarget(this.playerController.sprite)) {
+        detected = true;
+      }
+    }
+
+    // Handle detection
+    if (detected && !this.chaser.active) {
+      // Spawn chaser near the start of the level
+      const spawnX = this.dungeonResult.startX;
+      const spawnY = this.dungeonResult.startY;
+      this.chaser.spawn(spawnX, spawnY, this.pathfinder);
+    }
+
+    // Update chaser
+    if (this.chaser.active) {
+      this.chaser.update(dt);
+    }
+
+    // Check for barricade popup
+    this.checkBarricadePrompt();
+  }
+
+  private checkBarricadePrompt(): void {
+    const { groundLayer } = this.dungeonResult;
+    const px = this.playerController.sprite.x;
+    const py = this.playerController.sprite.y;
+    
+    const tx = groundLayer.worldToTileX(px);
+    const ty = groundLayer.worldToTileY(py);
+
+    if (tx === null || ty === null) return;
+
+    let canBarricade = false;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const tile = groundLayer.getTileAt(tx + dx, ty + dy);
+        
+        // This logic mirrors tryHide() checking
+        if (tile && !tile.collides && tile.index !== 42) {
+          canBarricade = true;
+        } else if (tile && tile.index === 42 && !tile.collides) {
+          const leftWall = groundLayer.getTileAt(tx + dx - 1, ty + dy);
+          const rightWall = groundLayer.getTileAt(tx + dx + 1, ty + dy);
+          if ((leftWall && rightWall && leftWall.collides && rightWall.collides) || 
+              (groundLayer.getTileAt(tx + dx, ty + dy - 1)?.collides && groundLayer.getTileAt(tx + dx, ty + dy + 1)?.collides)) {
+            canBarricade = true;
+          }
+        }
+      }
+    }
+
+    if (canBarricade) {
+      this.barricadePrompt?.setPosition(px, py - 20).setVisible(true);
+    } else {
+      this.barricadePrompt?.setVisible(false);
+    }
+  }
+
+  private tryHide(): void {
+    const { groundLayer } = this.dungeonResult;
+    const px = this.playerController.sprite.x;
+    const py = this.playerController.sprite.y;
+    
+    // Find nearby door tiles to block
+    const tx = groundLayer.worldToTileX(px);
+    const ty = groundLayer.worldToTileY(py);
+
+    if (tx === null || ty === null) return;
+
+    let blockedAny = false;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const tile = groundLayer.getTileAt(tx + dx, ty + dy);
+        if (tile && !tile.collides && tile.index !== 42) {
+          // If it's not a generic floor tile (42) and not colliding, it might be a door frame or similar
+          // Let's just make it collide and maybe tint it grey to show it's barricaded
+          
+          // Actually, a simpler approach: check if tile is walkable and not inside the main room
+          // But since any tile that is not floor(42) and not wall could be considered a gateway,
+          // Let's just set collision to true and tint it dark.
+          tile.setCollision(true);
+          (tile as any).tint = 0x333333; // dark tint
+          blockedAny = true;
+        } else if (tile && tile.index === 42) {
+          // It's a floor tile. To barricade, let's just create a physical barrier
+          // on the ground layer if the player presses B, but let's restrict to doorways.
+          // Standard door passage is usually floor (42) surrounded by walls.
+          // For simplicity, ANY floor tile near player when B is pressed turns into a barricade (collidable, index=0 which is BLANK/WALL or something like 210)
+          
+          // Only do this if we are near walls (doorway)
+          const leftWall = groundLayer.getTileAt(tx + dx - 1, ty + dy);
+          const rightWall = groundLayer.getTileAt(tx + dx + 1, ty + dy);
+          
+          if ((leftWall && rightWall && leftWall.collides && rightWall.collides) || 
+              (groundLayer.getTileAt(tx + dx, ty + dy - 1)?.collides && groundLayer.getTileAt(tx + dx, ty + dy + 1)?.collides)) {
+            tile.setCollision(true);
+            (tile as any).tint = 0x552222; // dark red
+            blockedAny = true;
+          }
+        }
+      }
+    }
+
+    if (blockedAny) {
+      // Small visual feedback on player
+      this.playerController.sprite.setTint(0x00ff00);
+      this.time.delayedCall(200, () => this.playerController.sprite.clearTint());
+    }
   }
 
   private toggleCollisionDebug(): void {

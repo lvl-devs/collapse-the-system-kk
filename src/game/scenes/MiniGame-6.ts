@@ -27,7 +27,6 @@ export default class MiniGame6 extends Phaser.Scene {
     preload() {
 
         this.load.image('keypad_bg', '../assets/images/KEYPAD.png');
-
         this.load.audio('key_beep', '../assets/sounds/keypad_beep.mp3');
     }
 
@@ -93,6 +92,9 @@ export default class MiniGame6 extends Phaser.Scene {
         this.createNumericKeypad(keypadStartY);
         this.createActionButtons(keypadStartY);
 
+        // Bottone X
+        this.createCloseButton();
+
         const keyboard = this.input.keyboard;
 
         keyboard?.on('keydown', (event: KeyboardEvent) => {
@@ -140,6 +142,40 @@ export default class MiniGame6 extends Phaser.Scene {
 
                 this.resetCode();
             }
+
+        });
+    }
+
+    private createCloseButton(): void {
+
+        const centerX = this.cameras.main.width / 2;
+
+        const x = centerX + 220; // più a destra
+        const y = 90;
+
+        const radius = 14;
+
+        const graphics = this.add.graphics();
+
+        // cerchio rosso contorno
+        graphics.lineStyle(3, 0xff0000);
+        graphics.strokeCircle(x, y, radius);
+
+        // X bianca
+        graphics.lineStyle(3, 0xffffff);
+        graphics.beginPath();
+        graphics.moveTo(x - 6, y - 6);
+        graphics.lineTo(x + 6, y + 6);
+        graphics.moveTo(x + 6, y - 6);
+        graphics.lineTo(x - 6, y + 6);
+        graphics.strokePath();
+
+        const hitArea = this.add.circle(x, y, radius + 4, 0x000000, 0);
+        hitArea.setInteractive({ useHandCursor: true });
+
+        hitArea.on('pointerdown', () => {
+
+            this.scene.start('GamePlay');
 
         });
     }
@@ -218,7 +254,6 @@ export default class MiniGame6 extends Phaser.Scene {
             if (!this.inputEnabled) return;
 
             button.setTexture(pressedImageKey);
-
             this.playKeySound();
         });
 
@@ -306,7 +341,6 @@ export default class MiniGame6 extends Phaser.Scene {
         if (this.code.length > 0) {
 
             this.code = this.code.slice(0, -1);
-
             this.updateDisplay();
         }
     }
@@ -368,7 +402,6 @@ export default class MiniGame6 extends Phaser.Scene {
     private resetCode(): void {
 
         this.code = '';
-
         this.updateDisplay();
     }
 }

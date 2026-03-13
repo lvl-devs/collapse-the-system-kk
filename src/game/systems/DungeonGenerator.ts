@@ -220,99 +220,7 @@ export class DungeonGenerator {
     });
 
     // Pass 2a-fix: junction corrections using full 8-neighbor context.
-    for (let ty = 0; ty < dungeon.height; ty++) {
-      for (let tx = 0; tx < dungeon.width; tx++) {
-        const t = groundLayer.getTileAt(tx, ty);
-        if (!t || t.index < 0) continue;
-
-        const above     = groundLayer.getTileAt(tx,     ty - 1);
-        const below     = groundLayer.getTileAt(tx,     ty + 1);
-        const left      = groundLayer.getTileAt(tx - 1, ty);
-        const right     = groundLayer.getTileAt(tx + 1, ty);
-        const belowLeft  = groundLayer.getTileAt(tx - 1, ty + 1);
-        const belowRight = groundLayer.getTileAt(tx + 1, ty + 1);
-
-        const li = left?.index  ?? -1;
-        const ri = right?.index ?? -1;
-        const ai = above?.index ?? -1;
-        const bi = below?.index ?? -1;
-        const bli = belowLeft?.index  ?? -1;
-        const bri = belowRight?.index ?? -1;
-
-        if (t.index === 210) {
-          if (ai === 42 && li === 42 && ri === 42 && bi === 170 && bli === 150) {
-            groundLayer.putTileAt(42, tx, ty);
-          } else if (li === 150) {
-            groundLayer.putTileAt(148, tx, ty);
-          } else if (li === 170) {
-            groundLayer.putTileAt(170, tx, ty);
-          }
-
-        } else if (t.index === 148) {
-          if (li === 150 || li === 170) {
-            // spurio: due porte adiacenti o parete normale a sinistra → parete inferiore
-            groundLayer.putTileAt(170, tx, ty);
-          } else if (li === 189) {
-            groundLayer.putTileAt(210, tx, ty);
-          } else if (ri === 73) {
-            groundLayer.putTileAt(212, tx, ty);
-            groundLayer.putTileAt(194, tx + 1, ty);
-          }
-
-        } else if (t.index === 170) {
-          if (ri === 210) {
-            groundLayer.putTileAt(192, tx, ty);
-          } else if (ai === 130 && ri === 86) {
-            // parete laterale sopra e cap sotto → frame porta destro superiore
-            groundLayer.putTileAt(108, tx, ty);
-          } else if (bi === 2 || bi === 3 || bi === 4) {
-            groundLayer.putTileAt(189, tx, ty);
-          } else if (li === 42 && bi === 171) {
-            groundLayer.putTileAt(150, tx, ty);
-          } else if (bi === 130 && bri === 126) {
-            // passaggio tra stanze: parete destra (130) sotto, parete sinistra (126) sotto-destra → frame destro porta
-            groundLayer.putTileAt(150, tx, ty);
-          } else if (bi === 126 && bli === 130) {
-            // passaggio tra stanze: parete sinistra (126) sotto, parete destra (130) sotto-sinistra → frame sinistro porta
-            groundLayer.putTileAt(148, tx, ty);
-          }
-
-        } else if (t.index === 150) {
-          if (ai === 130 && (ri === 86 || ri === 87) && (bi === 2 || bi === 3 || bi === 4)) {
-            groundLayer.putTileAt(108, tx, ty);
-          } else if (ri === 148 || ri === 210) {
-            // frame destro spurio adiacente al frame sinistro di un'altra porta
-            groundLayer.putTileAt(170, tx, ty);
-          } else if (ri === 189) {
-            groundLayer.putTileAt(212, tx, ty);
-          } else if (ri === 170) {
-            if (bri === 2 || bri === 3 || bri === 4) {
-              groundLayer.putTileAt(212, tx, ty);
-            }
-          }
-
-        } else if (t.index === 169) {
-          if (ri === 189 || (ri === 170 && (bri === 2 || bri === 3 || bri === 4))) {
-            groundLayer.putTileAt(214, tx, ty);
-          }
-
-        } else if (t.index === 171) {
-          if (li === 189) {
-            groundLayer.putTileAt(194, tx, ty);
-          }
-
-        } else if (t.index === 73) {
-          if (li === 148) {
-            groundLayer.putTileAt(212, tx - 1, ty);
-            groundLayer.putTileAt(194, tx, ty);
-          }
-        } else if (t.index === 42) {
-          if (ai === 130 && bi === 150) {
-            groundLayer.putTileAt(130, tx, ty);
-          }
-        }
-      }
-    }
+    this.applyJunctionFixes(groundLayer, dungeon);
 
     // Pass 2b: Place corners and cap rows now that ALL door positions are known.
     dungeon.rooms.forEach((room) => {
@@ -462,6 +370,10 @@ export class DungeonGenerator {
         }
       });
     }
+
+    // Final cleanup pass: corners and corridor painting can recreate broken junctions,
+    // so run the junction fixer again on the final tile layout.
+    this.applyJunctionFixes(groundLayer, dungeon);
 
     // Setup collisions
     groundLayer.setCollisionByExclusion([-1, ...TILES.FLOOR_INDICES]);
@@ -697,6 +609,434 @@ export class DungeonGenerator {
     }
 
     return result;
+  }
+
+  private static applyJunctionFixes(
+    groundLayer: Phaser.Tilemaps.TilemapLayer,
+    dungeon: Dungeon,
+  ): void {
+    for (let pass = 0; pass < 2; pass++) {
+      // Read from a stable snapshot during each pass so local rewrites
+      // don't affect neighbor checks of tiles processed later in the same pass.
+      const snapshot: number[][] = Array.from({ length: dungeon.height }, (_, y) =>
+        Array.from({ length: dungeon.width }, (_, x) => groundLayer.getTileAt(x, y)?.index ?? -1)
+      );
+      const at = (x: number, y: number): number => {
+        if (x < 0 || y < 0 || x >= dungeon.width || y >= dungeon.height) return -1;
+        return snapshot[y][x];
+      };
+
+      for (let ty = 0; ty < dungeon.height; ty++) {
+        for (let tx = 0; tx < dungeon.width; tx++) {
+          const ti = at(tx, ty);
+          if (ti < 0) continue;
+          const t = { index: ti } as { index: number };
+
+          const li = at(tx - 1, ty);
+          const ri = at(tx + 1, ty);
+          const ai = at(tx, ty - 1);
+          const bi = at(tx, ty + 1);
+          const bli = at(tx - 1, ty + 1);
+          const bri = at(tx + 1, ty + 1);
+
+          if (t.index === 214) {
+            // In these junctions 214 protrudes outside the room; continue the left wall instead.
+            if (bi === 126 && (ri === 189 || ri === 210)) {
+              groundLayer.putTileAt(126, tx, ty);
+            }
+
+          } else if (t.index === 210) {
+            if (ai === 42 && li === 42 && ri === 42 && bi === 170 && bli === 150) {
+              groundLayer.putTileAt(42, tx, ty);
+            } else if (ai === 42 && li === 150 && ri === 210 && bi === 126) {
+              // Reported missplacement: this junction is 192.
+              groundLayer.putTileAt(192, tx, ty);
+            } else if (ai === 42 && li === 150 && ri === 189 && bi === 126) {
+              // Reported missplacement: this junction is 192.
+              groundLayer.putTileAt(192, tx, ty);
+            } else if (ai === 42 && li === 130 && ri === 42 && bi === 126) {
+              // Reported missplacement: should be inner-bottom-left curve.
+              groundLayer.putTileAt(148, tx, ty);
+            } else if (ai === 42 && li === 170 && ri === 42 && bi === 169 && (bri === 126 || bri === 170)) {
+              // Reported missplacement: inner transition should be 148, not 210.
+              groundLayer.putTileAt(148, tx, ty);
+            } else if (ai === 42 && li === 170 && ri === 42 && bi === 126) {
+              // Reported missplacement: same transition with plain 126 below.
+              groundLayer.putTileAt(148, tx, ty);
+            } else if (li === 192 && ai === 42 && bi === 126) {
+              groundLayer.putTileAt(148, tx, ty);
+            } else if (li === 150) {
+              groundLayer.putTileAt(148, tx, ty);
+            } else if (li === 170 && bi !== 126) {
+              groundLayer.putTileAt(170, tx, ty);
+            }
+
+          } else if (t.index === 192) {
+            // Stray 192 sandwiched between 170 and 210 → revert to plain bottom-wall.
+            if (li === 170 && ri === 210) {
+              groundLayer.putTileAt(170, tx, ty);
+            }
+
+          } else if (t.index === 148) {
+            if (ai === 42 && li === 170 && ri === 42 && (bi === 126 || bi === 169)) {
+              // Keep stable: this is already the desired inner-bottom-left curve.
+              groundLayer.putTileAt(148, tx, ty);
+            } else if (ai === 42 && li === 150 && ri === 42 && bi === 126) {
+              // Keep stable when converted from 210 in right-open corridors.
+              groundLayer.putTileAt(148, tx, ty);
+            } else if (ai === 42 && li === 170 && ri === 189 && bi === 126) {
+              // Reported missplacement: this junction is 192.
+              groundLayer.putTileAt(192, tx, ty);
+            } else if (li === 170 && ri === 189) {
+              groundLayer.putTileAt(192, tx, ty);
+            } else if (li === 150 || li === 170) {
+              groundLayer.putTileAt(170, tx, ty);
+            } else if (li === 189) {
+              groundLayer.putTileAt(210, tx, ty);
+            } else if (ri === 73) {
+              groundLayer.putTileAt(212, tx, ty);
+              groundLayer.putTileAt(194, tx + 1, ty);
+            }
+
+          } else if (t.index === 170) {
+            // Corridor start/end caps: floor above + floor on one side
+            if (ai === 42 && li === 42 && ri === 170) {
+              if (bi === 130 && bri === 169) {
+                // Reported missplacement: this should be inner-bottom-right curve.
+                groundLayer.putTileAt(150, tx, ty);
+              } else {
+                groundLayer.putTileAt(212, tx, ty);
+              }
+            } else if (ai === 42 && li === 42 && ri === 148 && bi === 171 && bli === 170) {
+              // Reported missplacement: this should be inner-bottom-right curve.
+              groundLayer.putTileAt(150, tx, ty);
+            } else if (ai === 42 && li === 42 && ri === 148 && bi === 171) {
+              // Reported missplacement: this should be inner-bottom-right curve.
+              groundLayer.putTileAt(150, tx, ty);
+            } else if (ai === 42 && li === 42 && ri === 148 && bi === 130) {
+              // Reported missplacement: this should be inner-bottom-right curve.
+              groundLayer.putTileAt(150, tx, ty);
+            } else if (ai === 42 && li === 42 && ri === 170 && bi === 130 && bri === 169) {
+              // Reported missplacement: keep as 150 in this exact junction.
+              groundLayer.putTileAt(150, tx, ty);
+            } else if (ai === 42 && li === 170 && ri === 42 && bi === 169 && bri === 170) {
+              // Reported missplacement: symmetric inner-left curve.
+              groundLayer.putTileAt(148, tx, ty);
+            } else if (ai === 42 && li === 170 && ri === 42 && bi === 169 && bri === 126) {
+              // Reported missplacement: same junction with 126 at bottom-right.
+              groundLayer.putTileAt(148, tx, ty);
+            } else if (ai === 42 && li === 42 && ri === 170 && bi === 130) {
+              // Reported missplacement: this should be inner-bottom-right curve.
+              groundLayer.putTileAt(150, tx, ty);
+            } else if (ai === 42 && li === 170 && ri === 42 && bi === 169) {
+              // Reported missplacement: this should be inner-bottom-left curve.
+              groundLayer.putTileAt(148, tx, ty);
+            } else if (ai === 42 && li === 42 && ri === 170) {
+              groundLayer.putTileAt(212, tx, ty);
+            } else if (ai === 42 && li === 150 && ri === 42 && bi === 169) {
+              // Reported missplacement: this should bend into the inner-left corner.
+              groundLayer.putTileAt(148, tx, ty);
+            } else if (ai === 42 && li === 150 && ri === 42 && bi === 126) {
+              // Reported missplacement: should curve into left wall.
+              groundLayer.putTileAt(148, tx, ty);
+            } else if (ai === 42 && li === 170 && ri === 189 && bi === 126) {
+              // Keep this junction as 192 if it drifted to 170 in prior pass.
+              groundLayer.putTileAt(192, tx, ty);
+            } else if (ai === 42 && ri === 42 && li === 170) {
+              groundLayer.putTileAt(210, tx, ty);
+            } else if (ai === 42 && bi === 126) {
+              groundLayer.putTileAt(126, tx, ty);
+            } else if (ai === 42 && bi === 130) {
+              groundLayer.putTileAt(130, tx, ty);
+            } else if (ri === 210 && li !== 170) {
+              groundLayer.putTileAt(192, tx, ty);
+            } else if (ai === 130 && ri === 86) {
+              groundLayer.putTileAt(108, tx, ty);
+            } else if (bi === 2 || bi === 3 || bi === 4) {
+              groundLayer.putTileAt(189, tx, ty);
+            } else if (li === 42 && bi === 171) {
+              groundLayer.putTileAt(150, tx, ty);
+            } else if (bi === 130 && bri === 126) {
+              groundLayer.putTileAt(150, tx, ty);
+            } else if (bi === 126 && bli === 130) {
+              groundLayer.putTileAt(148, tx, ty);
+            } else if (bi === 126 && bli === 171) {
+              groundLayer.putTileAt(148, tx, ty);
+            } else if (bi === 171 && li === 42) {
+              groundLayer.putTileAt(150, tx, ty);
+            }
+
+          } else if (t.index === 150) {
+            // Inner-bottom-right corner surrounded by wall tiles: reduce to plain left-wall.
+            if (ai === 130 && li === 42 && (ri === 128)) {
+              groundLayer.putTileAt(126, tx, ty);
+            } else if (ai === 42 && (li === 189 || li === 2) && (ri === 170 || ri === 212) && bi === 130) {
+              // Reported missplacement: this junction is the 191 transition.
+              groundLayer.putTileAt(191, tx, ty);
+            } else if (ai === 42 && (bi === 2 || bi === 3 || bi === 4) && (ri === 86 || ri === 170 || bri === 130)) {
+              groundLayer.putTileAt(108, tx, ty);
+            } else if (ai === 130 && (ri === 86 || ri === 87) && (bi === 2 || bi === 3 || bi === 4)) {
+              groundLayer.putTileAt(108, tx, ty);
+            } else if (ri === 148 || ri === 210) {
+              groundLayer.putTileAt(170, tx, ty);
+            } else if (ri === 189) {
+              groundLayer.putTileAt(212, tx, ty);
+            } else if (ri === 170) {
+              if (bri === 2 || bri === 3 || bri === 4) {
+                groundLayer.putTileAt(212, tx, ty);
+              }
+            }
+
+          } else if (t.index === 212) {
+            // Left corridor-start cap with floor above/left and bottom-wall to the right
+            // → inner-bottom-right curve (150): the room wall continues here.
+            if (ai === 130 && li === 42 && (ri === 86 || ri === 87) && (bi === 2 || bi === 3 || bi === 4)) {
+              // Reported missplacement: this should be the upper door-frame transition.
+              groundLayer.putTileAt(108, tx, ty);
+            } else if (ai === 42 && li === 42 && ri === 194 && bi === 130) {
+              // Reported missplacement: should be inner-bottom-right curve.
+              groundLayer.putTileAt(150, tx, ty);
+            } else if (ai === 42 && li === 42 && ri === 126 && bi === 171 && bli === 170) {
+              // Reported missplacement: inner-bottom-right curve.
+              groundLayer.putTileAt(150, tx, ty);
+            } else if (ai === 42 && li === 42 && ri === 170) {
+              groundLayer.putTileAt(150, tx, ty);
+            }
+
+          } else if (t.index === 169) {
+            if (ri === 189 || (ri === 170 && (bri === 2 || bri === 3 || bri === 4))) {
+              groundLayer.putTileAt(214, tx, ty);
+            }
+
+          } else if (t.index === 171) {
+            if (li === 189) {
+              groundLayer.putTileAt(194, tx, ty);
+            }
+
+          } else if (t.index === 194) {
+            if (ai === 130 && li === 212 && ri === 128 && bi === 130) {
+              // Reported missplacement: this junction must use the special transition tile.
+              groundLayer.putTileAt(227, tx, ty);
+            } else if (ai === 130 && li === 212 && ri === 128 && bi === 128) {
+              // Reported missplacement: transition to lower wall variant.
+              groundLayer.putTileAt(171, tx, ty);
+            } else if (ai === 130 && li === 189 && ri === 128 && bi === 130) {
+              // New asset case requested by user.
+              groundLayer.putTileAt(227, tx, ty);
+            } else if (ai === 130 && li === 189 && ri === 85 && bi === 130) {
+              // New asset case requested by user.
+              groundLayer.putTileAt(227, tx, ty);
+            } else if (ai === 130 && li === 189 && ri === 169 && bi === 130) {
+              // New asset case requested by user.
+              groundLayer.putTileAt(227, tx, ty);
+            } else if (ai === 130 && li === 189 && ri === 126 && bi === 130) {
+              // New asset case requested by user.
+              groundLayer.putTileAt(227, tx, ty);
+            }
+
+          } else if (t.index === 73) {
+            if (li === 148) {
+              groundLayer.putTileAt(212, tx - 1, ty);
+              groundLayer.putTileAt(194, tx, ty);
+            }
+          } else if (t.index === 42) {
+            if (ai === 150 && li === 42 && ri === 128 && bi === 212) {
+              // Reported missplacement: corridor vertical wall continuation.
+              groundLayer.putTileAt(130, tx, ty);
+            } else if (ai === 130 && bi === 150) {
+              groundLayer.putTileAt(130, tx, ty);
+            }
+
+          } else if (t.index === 189) {
+            const leftIsTopCap = li === 2 || li === 3 || li === 4;
+            const rightIsTopCap = ri === 2 || ri === 3 || ri === 4;
+            if (leftIsTopCap && rightIsTopCap) {
+              // Rule: 189 cannot sit between two top-cap tiles.
+              groundLayer.putTileAt(2, tx, ty);
+              continue;
+            }
+            // Stray junction: appears right of an inner corner or top-wall, directly above a
+            // top-wall tile → normalize to top-wall. Guard: don't fire when followed by a
+            // top-wall run (ri=2/210) to avoid converting corridor caps placed in a previous pass.
+            const liIsTopWallOrCorner = li === 106 || li === 107 || li === 108 || li === 109
+              || li === 2 || li === 3 || li === 4 || li === 189;
+            const riContinuesWall = ri === 2 || ri === 3 || ri === 4 || ri === 189 || ri === 191 || ri === 194 || ri === 210;
+            if (liIsTopWallOrCorner && (bi === 2 || bi === 3 || bi === 4) && !riContinuesWall) {
+              groundLayer.putTileAt(2, tx, ty);
+            }
+
+          } else if (t.index === 2) {
+            // A '2' with floor above (ai=42) is in the gutter, not a room top-wall
+            // (room top-walls have blank=128 above, not floor=42).
+            // li=108 is intentionally excluded to avoid circular conversion with the 189→2 fix.
+            if (ai === 42) {
+              if (li === 189 && ri === 150 && bi === 2) {
+                // Reported missplacement: should stay as top junction.
+                groundLayer.putTileAt(189, tx, ty);
+                continue;
+              }
+              if (li === 189 && ri === 191 && bi === 2 && bri === 130) {
+                // Reported missplacement: should remain 189.
+                groundLayer.putTileAt(189, tx, ty);
+                continue;
+              }
+              if (li === 189 && ri === 130 && bi === 4) {
+                // Reported missplacement: should remain 189 in this top-run transition.
+                groundLayer.putTileAt(189, tx, ty);
+                continue;
+              }
+              if (li === 189 && ri === 191 && bi === 4 && bri === 130) {
+                // Reported missplacement: this should remain 189.
+                groundLayer.putTileAt(189, tx, ty);
+                continue;
+              }
+              if (bi === 2 || bi === 3 || bi === 4) {
+                // Reported cluster: in gutter chains this tile should stay as 189,
+                // except for the explicit 210 corridor-cap pattern.
+                const liCapFor210 = li === 189 || li === 212 || li === 2 || li === 3 || li === 4;
+                if (liCapFor210 && (ri === 42 || ri === 128)) {
+                  groundLayer.putTileAt(210, tx, ty);
+                } else {
+                  groundLayer.putTileAt(189, tx, ty);
+                }
+                continue;
+              }
+              if (li === 189 && ri === 189 && bi === 2) {
+                groundLayer.putTileAt(189, tx, ty);
+                continue;
+              }
+              const liIsCorridorCap = li === 189 || li === 212 || li === 2 || li === 3 || li === 4;
+              if (liIsCorridorCap && (ri === 42 || ri === 128)) {
+                groundLayer.putTileAt(210, tx, ty);
+              } else if (liIsCorridorCap) {
+                groundLayer.putTileAt(189, tx, ty);
+              }
+            }
+
+          } else if (t.index === 108) {
+            // Cases 2 & 7: inner top-right corner with floor above and to the left,
+            // next to a room wall or top-wall → replace with 212 corridor cap.
+            if (ai === 42 && li === 42 && (ri === 130 || ri === 170 || ri === 189 || ri === 86 || ri === 2 || ri === 3 || ri === 4)) {
+              groundLayer.putTileAt(212, tx, ty);
+            }
+
+          } else if (t.index === 86) {
+            // Reported missplacement: this top-right/side-wall transition should be 191.
+            if (ai === 42 && li === 108 && ri === 170 && bi === 130) {
+              groundLayer.putTileAt(191, tx, ty);
+            }
+
+          } else if (t.index === 126) {
+            // Reported missplacement: this left-wall junction is 192.
+            if (ai === 148 && li === 130 && ri === 210 && bi === 126 && bri === 2) {
+              // New asset case requested by user.
+              groundLayer.putTileAt(228, tx, ty);
+            } else if (ai === 126 && li === 130 && ri === 210 && bi === 126 && bri === 2) {
+              // New asset case requested by user.
+              groundLayer.putTileAt(228, tx, ty);
+            } else if (ai === 130 && li === 42 && ri === 189 && bi === 2 && bri === 2) {
+              // Reported missplacement: upper door-frame transition.
+              groundLayer.putTileAt(108, tx, ty);
+            } else if (ai === 130 && li === 130 && ri === 210 && bi === 126) {
+              // Reported missplacement: this should be 192.
+              groundLayer.putTileAt(192, tx, ty);
+            } else if (ai === 42 && li === 169 && ri === 210 && bi === 126) {
+              // Reported missplacement: this should be 192.
+              groundLayer.putTileAt(192, tx, ty);
+            } else if (ai === 130 && li === 42 && ri === 189 && bi === 2) {
+              // Reported missplacement: upper door-frame transition.
+              groundLayer.putTileAt(108, tx, ty);
+            } else if (ai === 130 && li === 42 && ri === 87 && bi === 4) {
+              // Reported missplacement: upper door-frame transition.
+              groundLayer.putTileAt(108, tx, ty);
+            } else if (ai === 130 && li === 42 && ri === 87 && (bi === 2 || bi === 3 || bi === 4)) {
+              // Reported missplacement: same transition also appears with top-cap runs below.
+              groundLayer.putTileAt(108, tx, ty);
+            } else if (ai === 169 && li === 169 && ri === 210 && bi === 126) {
+              // Reported missplacement: inner-left curve.
+              groundLayer.putTileAt(148, tx, ty);
+            } else if ((ai === 42 || ai === 130) && li === 42 && ri === 128 && bi === 130) {
+              // Reported missplacement: isolated left-wall should continue as 130.
+              groundLayer.putTileAt(130, tx, ty);
+            } else if (ai === 126 && li === 128 && ri === 189 && bi === 126 && bri === 2) {
+              // New asset case requested by user.
+              groundLayer.putTileAt(228, tx, ty);
+            } else if (ai === 42 && li === 212 && ri === 42 && bi === 126 && bli === 171) {
+              // Reported missplacement: should be inner-bottom-left curve.
+              groundLayer.putTileAt(148, tx, ty);
+            } else if (ai === 42 && li === 170 && ri === 210 && bi === 126) {
+              groundLayer.putTileAt(192, tx, ty);
+            } else if (ai === 42 && li === 170 && ri === 189 && bi === 126 && bli === 128 && bri === 2) {
+              // Reported missplacement: this should be 192.
+              groundLayer.putTileAt(192, tx, ty);
+            } else if (ai === 42 && li === 169 && ri === 189 && bi === 126) {
+              groundLayer.putTileAt(192, tx, ty);
+            // Case 2: corridor bottom-wall (170) to the left, junction tile (189) to the right,
+            // floor above → inner bottom-left curve (C opening right).
+            } else if (li === 170 && ri === 189 && ai === 42) {
+              groundLayer.putTileAt(148, tx, ty);
+            // Case 5: right-wall (130) to the left, floor to the right and above
+            // → two rooms share a vertical boundary; top of boundary = inner bottom-left curve.
+            } else if (li === 130 && ri === 42 && ai === 42) {
+              groundLayer.putTileAt(148, tx, ty);
+            // Cases 1 & 4: [126] immediately right of inner-bottom-right corner (150),
+            // with more left-wall (126) below → should be 210.
+            } else if (li === 150 && ai === 42 && bi === 126) {
+              groundLayer.putTileAt(210, tx, ty);
+            } else if (ai === 130 && ri === 86) {
+              // Left-wall top with a cap tile to the right → left-start corridor cap.
+              groundLayer.putTileAt(212, tx, ty);
+            }
+
+          } else if (t.index === 106) {
+            if (ai === 126 && li === 130 && ri === 23 && bi === 126) {
+              // Reported missplacement: this should stay as plain left wall.
+              groundLayer.putTileAt(126, tx, ty);
+            }
+
+          } else if (t.index === 130) {
+            if (ai === 42 && li === 42 && ri === 210 && bi === 130) {
+              // Reported missplacement: should be inner-bottom-right curve.
+              groundLayer.putTileAt(150, tx, ty);
+            } else if (ai === 42 && li === 108 && ri === 192 && bi === 130) {
+              // Reported missplacement: this transition is also 191 when right neighbor is 192.
+              groundLayer.putTileAt(191, tx, ty);
+            } else if (ai === 42 && li === 108 && ri === 170 && bi === 130) {
+              // Reported missplacement: this is 191 transition.
+              groundLayer.putTileAt(191, tx, ty);
+            } else if (ai === 42 && li === 189 && ri === 171 && bi === 130) {
+              // Reported missplacement: this is 191 transition.
+              groundLayer.putTileAt(191, tx, ty);
+            } else if (ai === 42 && li === 189 && ri === 148 && bi === 130) {
+              // Reported missplacement: this is 191 transition.
+              groundLayer.putTileAt(191, tx, ty);
+            } else if (ai === 42 && li === 2 && ri === 126 && bi === 130) {
+              // Reported missplacement: should be 191 transition.
+              groundLayer.putTileAt(191, tx, ty);
+            } else if (ai === 42 && li === 42 && ri === 148 && bi === 130) {
+              // Symmetric case with 148 at right.
+              groundLayer.putTileAt(150, tx, ty);
+            // Case 4: junction tile (189) to the left, corridor bottom-wall (170) to the right,
+            // floor above → inner bottom-right curve (C opening left).
+            } else if (li === 189 && ri === 170 && ai === 42) {
+              groundLayer.putTileAt(150, tx, ty);
+            // Case 6: floor to the left and above, left-wall (126) to the right
+            // → two rooms share a vertical boundary; top of boundary = inner bottom-right curve.
+            } else if (li === 42 && ri === 126 && ai === 42) {
+              groundLayer.putTileAt(150, tx, ty);
+            // Case 3: inner top-right corner (108) to the left, bottom-wall (170) to the right
+            // and more right-wall below → corridor cap tile 86.
+            } else if (li === 108 && ri === 170 && ai === 42) {
+              groundLayer.putTileAt(86, tx, ty);
+            // Case 10: top-wall (2) to the left, bottom-wall (170) to the right,
+            // floor above → corridor-wall transition 191.
+            } else if (li === 2 && ri === 170 && ai === 42) {
+              groundLayer.putTileAt(191, tx, ty);
+            }
+          }
+        }
+      }
+    }
   }
 }
 

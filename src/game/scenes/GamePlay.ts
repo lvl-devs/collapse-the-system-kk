@@ -26,9 +26,11 @@ export default class GamePlay extends Phaser.Scene {
   private escPauseKey?: Phaser.Input.Keyboard.Key;
   private collisionDebugKey?: Phaser.Input.Keyboard.Key;
   private tileOverlayToggleKey?: Phaser.Input.Keyboard.Key;
+  private tileProbeToggleKey?: Phaser.Input.Keyboard.Key;
   private currentLevelMusicKey?: string;
   private pausedSfxDuringPause: Phaser.Sound.BaseSound[] = [];
   private isAudioPausedForMenu = false;
+  private tileProbeMode = false;
 
   constructor() {
     super({ key: "GamePlay" });
@@ -118,6 +120,7 @@ export default class GamePlay extends Phaser.Scene {
     this.escPauseKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
     this.collisionDebugKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.C);
     this.tileOverlayToggleKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.I);
+    this.tileProbeToggleKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.P);
     this.escPauseKey?.on("down", this.openPauseMenu, this);
 
     this.add
@@ -132,7 +135,7 @@ export default class GamePlay extends Phaser.Scene {
       .setDepth(100);
 
     this.add
-      .text(16, 48, "C -> collision debug  |  I -> tile indices", {
+      .text(16, 48, "C -> collision debug  |  I -> full tile debug  |  P -> coords (light)", {
         fontFamily: GameData.globals.defaultFont.key,
         fontSize:   "11px",
         color:      "#666688",
@@ -149,12 +152,11 @@ export default class GamePlay extends Phaser.Scene {
       this.escPauseKey = undefined;
       this.collisionDebugKey = undefined;
       this.tileOverlayToggleKey = undefined;
+      this.tileProbeToggleKey = undefined;
       this.tileOverlayObjects.forEach(o => o.destroy());
       this.tileOverlayObjects = [];
-      this.hoverInfoPanel?.destroy();
-      this.hoverInfoPanel = undefined;
-      this.input.off("pointermove", this.onTileHover, this);
-      this.input.off("pointerdown", this.onTileCopy, this);
+      this.tileProbeMode = false;
+      this.clearHoverPanelAndListenersIfUnused();
     });
 
     console.log(
@@ -173,6 +175,9 @@ export default class GamePlay extends Phaser.Scene {
 
     if (this.tileOverlayToggleKey != null && Phaser.Input.Keyboard.JustDown(this.tileOverlayToggleKey)) {
       this.toggleTileIndexOverlay();
+    }
+    if (this.tileProbeToggleKey != null && Phaser.Input.Keyboard.JustDown(this.tileProbeToggleKey)) {
+      this.toggleTileProbeMode();
     }
 
     this.playerController.update();
@@ -210,12 +215,12 @@ export default class GamePlay extends Phaser.Scene {
       if (this.tileOverlayObjects.length > 0) {
         this.tileOverlayObjects.forEach(o => o.destroy());
         this.tileOverlayObjects = [];
-        this.hoverInfoPanel?.destroy();
-        this.hoverInfoPanel = undefined;
-        this.input.off("pointermove", this.onTileHover, this);
-        this.input.off("pointerdown", this.onTileCopy, this);
+        this.clearHoverPanelAndListenersIfUnused();
         return;
       }
+
+      // Full debug supersedes light probe mode.
+      this.tileProbeMode = false;
 
       const { groundLayer, stuffLayer } = this.dungeonResult;
       const ts = groundLayer.tileset[0].tileWidth;
@@ -267,7 +272,27 @@ export default class GamePlay extends Phaser.Scene {
         this.tileOverlayObjects.push(t);
       });
 
-      // Pannello hover fisso in basso a sinistra
+      this.ensureHoverPanel();
+  }
+
+  private toggleTileProbeMode(): void {
+    this.tileProbeMode = !this.tileProbeMode;
+
+    if (this.tileProbeMode) {
+      // Light mode should not render the heavy full overlay.
+      if (this.tileOverlayObjects.length > 0) {
+        this.tileOverlayObjects.forEach(o => o.destroy());
+        this.tileOverlayObjects = [];
+      }
+      this.ensureHoverPanel();
+      return;
+    }
+
+    this.clearHoverPanelAndListenersIfUnused();
+  }
+
+  private ensureHoverPanel(): void {
+    if (!this.hoverInfoPanel) {
       this.hoverInfoPanel = this.add.text(8, this.scale.height - 8, "— hover su un tile —", {
         fontFamily: "monospace",
         fontSize: "12px",
@@ -278,9 +303,21 @@ export default class GamePlay extends Phaser.Scene {
         .setScrollFactor(0)
         .setDepth(200)
         .setOrigin(0, 1);
+    }
+    this.input.off("pointermove", this.onTileHover, this);
+    this.input.off("pointerdown", this.onTileCopy, this);
+    this.input.on("pointermove", this.onTileHover, this);
+    this.input.on("pointerdown", this.onTileCopy, this);
+  }
 
-      this.input.on("pointermove", this.onTileHover, this);
-      this.input.on("pointerdown", this.onTileCopy, this);
+  private clearHoverPanelAndListenersIfUnused(): void {
+    if (this.tileOverlayObjects.length > 0 || this.tileProbeMode) {
+      return;
+    }
+    this.hoverInfoPanel?.destroy();
+    this.hoverInfoPanel = undefined;
+    this.input.off("pointermove", this.onTileHover, this);
+    this.input.off("pointerdown", this.onTileCopy, this);
   }
 
   private onTileHover(pointer: Phaser.Input.Pointer): void {

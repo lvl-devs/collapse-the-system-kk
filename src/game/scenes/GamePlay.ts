@@ -127,9 +127,10 @@ export default class GamePlay extends Phaser.Scene {
     // Initialize Chaser
     this.chaser = new ChaserEntity(this, startX, startY, "policeman", this.playerController.sprite);
 
-    // Initialize Cameras in other rooms
+    // Initialize Cameras in other rooms (disabled for hub layout)
     this.camerasList = [];
-    this.dungeonResult.otherRooms.forEach(room => {
+    const isHubMode = GameData.dungeon.defaultConfig.layout?.mode === "hub";
+    if (!isHubMode) this.dungeonResult.otherRooms.forEach(room => {
       const walls: DungeonWallSide[] = ["top", "bottom", "left", "right"];
       const wall = Phaser.Utils.Array.GetRandom(walls);
 
@@ -204,7 +205,7 @@ export default class GamePlay extends Phaser.Scene {
 
       const camera = new CameraEntity(this, cx, cy, wall, roomBounds, groundLayer);
       this.camerasList.push(camera);
-    });
+    }); // end !isHubMode forEach
 
     this.escPauseKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
     this.collisionDebugKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.C);

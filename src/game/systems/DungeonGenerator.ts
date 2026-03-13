@@ -15,6 +15,18 @@ export type DungeonThemeKey = "cyber" | "cave" | "facility" | "void";
 export type DungeonRoomRole = "start" | "end" | "other";
 export type DungeonWallSide = "top" | "bottom" | "left" | "right";
 
+export interface DungeonLayoutConfig {
+  mode?: "procedural" | "hub";
+  roomCount?: number;
+  hubIndex?: number;
+  links?: Array<[number, number]>;
+  roomSize?: {
+    width?: number;
+    height?: number;
+  };
+  spacing?: number;
+}
+
 export interface DungeonTheme {
   key: DungeonThemeKey;
   label: string;
@@ -37,6 +49,7 @@ export interface DungeonConfig {
     maxRooms?: number;
     maxArea?: number;
   };
+  layout?: DungeonLayoutConfig;
   placement?: {
     stairs?: {
       tileIndex?: number;
@@ -103,6 +116,10 @@ export class DungeonGenerator {
     const { tileSize, theme: themeKey } = config;
     const theme = DUNGEON_THEMES[themeKey] ?? DUNGEON_THEMES.cyber;
     const TILES = DEFAULT_TILES;
+
+    if (config.layout?.mode === "hub") {
+      return this.buildHubTilemap(scene, config, theme, TILES);
+    }
 
     // Generate dungeon layout with odd-sized rooms for centered objects
     const dungeon = new Dungeon({
@@ -372,111 +389,10 @@ export class DungeonGenerator {
     }
 
     // Pass 3: Final Junction Correction Pass
-    // Runs AFTER all passes to fix T-junctions, L-junctions and stray frame tiles.
-    // Neighborhoods:
-    //   ai = above,  bi = below,  li = left,  ri = right
-    //   ali = above-left,  ari = above-right,  bli = below-left,  bri = below-right
-    for (let ty = 0; ty < dungeon.height; ty++) {
-      for (let tx = 0; tx < dungeon.width; tx++) {
-        const t = groundLayer.getTileAt(tx, ty);
-        if (!t || t.index < 0) continue;
+    this.applyJunctionCorrection(groundLayer, dungeon, TILES);
 
-        const above = groundLayer.getTileAt(tx, ty - 1);
-        const below = groundLayer.getTileAt(tx, ty + 1);
-        const left  = groundLayer.getTileAt(tx - 1, ty);
-        const right = groundLayer.getTileAt(tx + 1, ty);
-        const aboveLeft  = groundLayer.getTileAt(tx - 1, ty - 1);
-        const aboveRight = groundLayer.getTileAt(tx + 1, ty - 1);
-        const belowLeft  = groundLayer.getTileAt(tx - 1, ty + 1);
-        const belowRight = groundLayer.getTileAt(tx + 1, ty + 1);
-
-        const ai  = above?.index      ?? -1;
-        const bi  = below?.index      ?? -1;
-        const li  = left?.index       ?? -1;
-        const ri  = right?.index      ?? -1;
-        const ali = aboveLeft?.index  ?? -1;
-        const ari = aboveRight?.index ?? -1;
-        const bli = belowLeft?.index  ?? -1;
-        const bri = belowRight?.index ?? -1;
-
-        // ── Helpers ─────────────────────────────────────────────────────
-        const isTopWall    = (i: number) => i === 2 || i === 3 || i === 4;
-        const isBottomWall = (i: number) => i === 169 || i === 170 || i === 171;
-        const isFloor      = (i: number) => i === 42;
-
-        // ── T-junctions: right wall drops onto roof of adjacent room ────
-        // 130 above + top wall below → 108 (top-right door frame)
-        if (t.index === 150 && ai === 130 && isTopWall(bi)) {
-          groundLayer.putTileAt(108, tx, ty);
-        }
-        // 126 above + top wall below → 106 (top-left door frame)
-        else if (t.index === 169 && ai === 126 && isTopWall(bi)) {
-          groundLayer.putTileAt(106, tx, ty);
-        }
-        // 130 above + bottom wall below → 108 (right side continues through room bottom)
-        else if (t.index === 150 && ai === 130 && isBottomWall(bi)) {
-          groundLayer.putTileAt(108, tx, ty);
-        }
-        // 126 above + bottom wall below → 106
-        else if (t.index === 169 && ai === 126 && isBottomWall(bi)) {
-          groundLayer.putTileAt(106, tx, ty);
-        }
-
-        // ── Horizontal junctions: 210 (bottom-left frame used by corridor) ─
-        // 210 to the right of 150 and above 126 wall → should be 148
-        else if (t.index === 210 && li === 150 && bi === 126) {
-          groundLayer.putTileAt(148, tx, ty);
-        }
-        // 210 to the right of 148 → floor (double frame collision)
-        else if (t.index === 210 && li === 148) {
-          groundLayer.putTileAt(42, tx, ty);
-        }
-
-        // ── Stray bottom frames next to continuous walls ─────────────────
-        // 148 immediately right of a bottom wall → also bottom wall
-        else if (t.index === 148 && li === 170) {
-          groundLayer.putTileAt(170, tx, ty);
-        }
-        // 150 immediately left of a bottom wall → also bottom wall
-        else if (t.index === 150 && ri === 170) {
-          groundLayer.putTileAt(170, tx, ty);
-        }
-        // 148 below a right wall (130) → should be bottom-right corner (171)
-        else if (t.index === 148 && ai === 130 && isFloor(li)) {
-          groundLayer.putTileAt(171, tx, ty);
-        }
-        // 150 below a left wall (126) → should be bottom-left corner (169)
-        else if (t.index === 150 && ai === 126 && isFloor(ri)) {
-          groundLayer.putTileAt(169, tx, ty);
-        }
-
-        // ── Stray top frames next to continuous top wall ─────────────────
-        else if (t.index === 106 && isTopWall(li) && isFloor(ri)) {
-          groundLayer.putTileAt(li, tx, ty);
-        }
-        else if (t.index === 108 && isTopWall(ri) && isFloor(li)) {
-          groundLayer.putTileAt(ri, tx, ty);
-        }
-
-        // ── Floor tile masking a side wall column ────────────────────────
-        // Floor between two stacked side-walls should be the correct wall tile
-        else if (isFloor(t.index) && ai === 130 && bi === 130) {
-          groundLayer.putTileAt(130, tx, ty);
-        }
-        else if (isFloor(t.index) && ai === 126 && bi === 126) {
-          groundLayer.putTileAt(126, tx, ty);
-        }
-
-        // ── Completely floating door-frame tiles (no wall neighbors) ─────
-        else if ([106, 108, 148, 150].includes(t.index)) {
-          const wallNeighbors = [ai, bi, li, ri, ali, ari, bli, bri]
-            .filter(i => i === 2 || i === 3 || i === 4 || i === 23 || i === 126 || i === 130 || isBottomWall(i) || i === 86);
-          if (wallNeighbors.length === 0) {
-            groundLayer.putTileAt(42, tx, ty); // replace with floor
-          }
-        }
-      }
-    }
+    // Setup collisions
+    groundLayer.setCollisionByExclusion([-1, ...TILES.FLOOR_INDICES]);
 
 
     // Setup collisions
@@ -625,6 +541,388 @@ export class DungeonGenerator {
     return { map, groundLayer, stuffLayer, dungeon, startRoom, endRoom, otherRooms, startX, startY };
   }
 
+  private static buildHubTilemap(
+    scene: Phaser.Scene,
+    config: DungeonConfig,
+    theme: DungeonTheme,
+    tiles: typeof DEFAULT_TILES,
+  ): DungeonBuildResult {
+    const tileSize = config.tileSize;
+    const tilesetKey = theme.tilesetKey;
+    const canvasKey = `dungeon-canvas-${theme.key}`;
+    const activeKey = scene.textures.exists(tilesetKey) ? tilesetKey : canvasKey;
+    if (activeKey === canvasKey && !scene.textures.exists(canvasKey)) {
+      scene.textures.addCanvas(canvasKey, createCanvasTileset(tileSize, theme.key));
+    }
+
+    const map = scene.make.tilemap({
+      tileWidth: tileSize,
+      tileHeight: tileSize,
+      width: config.width,
+      height: config.height,
+    });
+
+    const tileset = map.addTilesetImage(activeKey, activeKey, tileSize, tileSize, 0, 0);
+    if (!tileset) throw new Error(`[DungeonGenerator] Tileset "${activeKey}" not available.`);
+
+    const groundLayer = map.createBlankLayer("Ground", tileset)!.setDepth(0);
+    const stuffLayer = map.createBlankLayer("Stuff", tileset)!.setDepth(1);
+    groundLayer.fill(tiles.BLANK);
+
+    const roomWidth = this.pickOddRoomSize(config.rooms.width.min, config.rooms.width.max, config.layout?.roomSize?.width);
+    const roomHeight = this.pickOddRoomSize(config.rooms.height.min, config.rooms.height.max, config.layout?.roomSize?.height);
+    const roomCount = Phaser.Math.Clamp(config.layout?.roomCount ?? 5, 1, 16);
+    const hubIndex = Phaser.Math.Clamp(config.layout?.hubIndex ?? 0, 0, roomCount - 1);
+    const minimumSpacing = Math.max(roomWidth, roomHeight) + 2;
+    const spacing = Math.max(minimumSpacing, config.layout?.spacing ?? minimumSpacing);
+
+    const offsets = this.getHubOffsets(roomCount);
+    const centerTileX = Math.floor(config.width / 2);
+    const centerTileY = Math.floor(config.height / 2);
+
+    const rooms: Room[] = offsets.map((offset) => {
+      const left = Phaser.Math.Clamp(
+        centerTileX + offset.x * spacing - Math.floor(roomWidth / 2),
+        1,
+        Math.max(1, config.width - roomWidth - 2),
+      );
+      const top = Phaser.Math.Clamp(
+        centerTileY + offset.y * spacing - Math.floor(roomHeight / 2),
+        1,
+        Math.max(1, config.height - roomHeight - 2),
+      );
+
+      const room = this.createRoomLike(left, top, roomWidth, roomHeight);
+      this.paintRoom(groundLayer, room, tiles);
+      return room;
+    });
+
+    const links = this.normalizeLinks(config.layout?.links, roomCount, hubIndex);
+    for (const [fromIndex, toIndex] of links) {
+      const from = rooms[fromIndex];
+      const to = rooms[toIndex];
+      const anchors = this.getRoomLinkAnchors(from, to);
+      this.carveRoomLinkCorridor(groundLayer, anchors.x1, anchors.y1, anchors.x2, anchors.y2, tiles, from, to);
+    }
+
+    groundLayer.setCollisionByExclusion([-1, ...tiles.FLOOR_INDICES]);
+
+    const startRoom = rooms[hubIndex];
+    const endRoom = this.pickFarthestRoom(startRoom, rooms, hubIndex);
+    const otherRooms = rooms.filter((room) => room !== startRoom && room !== endRoom);
+
+    const stairsRole = config.placement?.stairs?.roomRole ?? "end";
+    const stairsRoom = stairsRole === "start" ? startRoom : stairsRole === "other" ? (otherRooms[0] ?? endRoom) : endRoom;
+    stuffLayer.putTileAt(config.placement?.stairs?.tileIndex ?? tiles.STAIRS, stairsRoom.centerX, stairsRoom.centerY);
+    stuffLayer.setCollisionByExclusion([-1, ...tiles.FLOOR_INDICES]);
+
+    const startX = (map.tileToWorldX(startRoom.centerX) ?? 0) + tileSize / 2;
+    const startY = (map.tileToWorldY(startRoom.centerY) ?? 0) + tileSize / 2;
+
+    scene.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
+    scene.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
+
+    const dungeonLike = { rooms, width: config.width, height: config.height } as unknown as Dungeon;
+    this.applyJunctionCorrection(groundLayer, dungeonLike, tiles);
+
+    return { map, groundLayer, stuffLayer, dungeon: dungeonLike, startRoom, endRoom, otherRooms, startX, startY };
+  }
+
+  private static pickOddRoomSize(min: number, max: number, preferred?: number): number {
+    const clampedMin = Math.max(7, min);
+    const clampedMax = Math.max(clampedMin, max);
+    const base = preferred == null
+      ? Math.floor((clampedMin + clampedMax) / 2)
+      : Phaser.Math.Clamp(Math.floor(preferred), clampedMin, clampedMax);
+    return base % 2 === 0 ? base + 1 <= clampedMax ? base + 1 : base - 1 : base;
+  }
+
+  private static getHubOffsets(count: number): Array<{ x: number; y: number }> {
+    const base: Array<{ x: number; y: number }> = [
+      { x: 0, y: 0 },
+      { x: 0, y: -1 },
+      { x: 1, y: 0 },
+      { x: 0, y: 1 },
+      { x: -1, y: 0 },
+      { x: 1, y: -1 },
+      { x: 1, y: 1 },
+      { x: -1, y: 1 },
+      { x: -1, y: -1 },
+      { x: 0, y: -2 },
+      { x: 2, y: 0 },
+      { x: 0, y: 2 },
+      { x: -2, y: 0 },
+      { x: 2, y: -1 },
+      { x: 2, y: 1 },
+      { x: -2, y: 1 },
+    ];
+    return base.slice(0, Math.min(count, base.length));
+  }
+
+  private static normalizeLinks(
+    links: Array<[number, number]> | undefined,
+    roomCount: number,
+    hubIndex: number,
+  ): Array<[number, number]> {
+    const normalizePair = (a: number, b: number): [number, number] => a < b ? [a, b] : [b, a];
+    const result = new Map<string, [number, number]>();
+
+    const input = links != null && links.length > 0
+      ? links
+      : Array.from({ length: roomCount - 1 }, (_, i) => [hubIndex, i < hubIndex ? i : i + 1] as [number, number]);
+
+    for (const [rawA, rawB] of input) {
+      const a = Math.floor(rawA);
+      const b = Math.floor(rawB);
+      if (a === b || a < 0 || b < 0 || a >= roomCount || b >= roomCount) continue;
+      const [na, nb] = normalizePair(a, b);
+      result.set(`${na}-${nb}`, [na, nb]);
+    }
+
+    return Array.from(result.values());
+  }
+
+  private static createRoomLike(x: number, y: number, width: number, height: number): Room {
+    const left = x;
+    const top = y;
+    const right = x + width - 1;
+    const bottom = y + height - 1;
+    const roomLike = {
+      x,
+      y,
+      width,
+      height,
+      left,
+      right,
+      top,
+      bottom,
+      centerX: x + Math.floor(width / 2),
+      centerY: y + Math.floor(height / 2),
+      getDoorLocations: () => [] as Array<{ x: number; y: number }>,
+    };
+    return roomLike as unknown as Room;
+  }
+
+  private static paintRoom(
+    groundLayer: Phaser.Tilemaps.TilemapLayer,
+    room: Room,
+    tiles: typeof DEFAULT_TILES,
+  ): void {
+    const { x, y, width, height, left, right, top, bottom } = room;
+    groundLayer.weightedRandomize(tiles.FLOOR, x + 1, y + 2, width - 2, height - 3);
+    groundLayer.weightedRandomize(tiles.WALL.TOP, left + 1, top, width - 2, 1);
+    groundLayer.weightedRandomize(tiles.WALL.TOP_BODY, left + 1, top + 1, width - 2, 1);
+    groundLayer.weightedRandomize(tiles.WALL.BOTTOM, left + 1, bottom, width - 2, 1);
+    groundLayer.weightedRandomize(tiles.WALL.LEFT, left, top + 2, 1, height - 3);
+    groundLayer.weightedRandomize(tiles.WALL.RIGHT, right, top + 2, 1, height - 3);
+
+    groundLayer.putTileAt(tiles.WALL.TOP_LEFT, left, top);
+    groundLayer.putTileAt(tiles.WALL.TOP_RIGHT, right, top);
+    groundLayer.putTileAt(tiles.WALL.TOP_LEFT_BODY, left, top + 1);
+    groundLayer.putTileAt(tiles.WALL.TOP_RIGHT_BODY, right, top + 1);
+    groundLayer.putTileAt(tiles.WALL.BOTTOM_LEFT, left, bottom);
+    groundLayer.putTileAt(tiles.WALL.BOTTOM_RIGHT, right, bottom);
+
+    // Add cap row above the room
+    const capY = top - 1;
+    if (capY >= 0) {
+      groundLayer.weightedRandomize(tiles.TOP_CAP.CENTER, left + 1, capY, width - 2, 1);
+      groundLayer.putTileAt(tiles.TOP_CAP.LEFT, left, capY);
+      groundLayer.putTileAt(tiles.TOP_CAP.RIGHT, right, capY);
+    }
+  }
+
+  private static carveRoomLinkCorridor(
+    groundLayer: Phaser.Tilemaps.TilemapLayer,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    tiles: typeof DEFAULT_TILES,
+    fromRoom: Room,
+    toRoom: Room,
+  ): void {
+    const FLOOR = tiles.FLOOR[0].index as number;
+    const BOTTOM = tiles.WALL.BOTTOM[0].index as number;
+    const LEFT = tiles.WALL.LEFT[0].index as number;
+    const RIGHT = tiles.WALL.RIGHT[0].index as number;
+    const W = groundLayer.layer.width;
+    const H = groundLayer.layer.height;
+
+    const put = (tx: number, ty: number, idx: number): void => {
+      if (tx < 0 || ty < 0 || tx >= W || ty >= H) return;
+      groundLayer.putTileAt(idx, tx, ty);
+    };
+    const putIfBlank = (tx: number, ty: number, idx: number): void => {
+      if (tx < 0 || ty < 0 || tx >= W || ty >= H) return;
+      const existing = groundLayer.getTileAt(tx, ty);
+      if (existing && existing.index !== tiles.BLANK) return;
+      groundLayer.putTileAt(idx, tx, ty);
+    };
+    const putFloor = (tx: number, ty: number): void => put(tx, ty, FLOOR);
+
+    const carveHorizontalLane = (fromX: number, toX: number, y: number): void => {
+      const stepX = toX >= fromX ? 1 : -1;
+      for (let cx = fromX; stepX > 0 ? cx <= toX : cx >= toX; cx += stepX) {
+        putFloor(cx, y);
+        putFloor(cx, y + 1);
+        putIfBlank(cx, y - 1, 86); // Was TOP_BODY (23), now shadow cap center
+        putIfBlank(cx, y + 2, BOTTOM);
+      }
+    };
+
+    const carveVerticalLane = (x: number, fromY: number, toY: number): void => {
+      const stepY = toY >= fromY ? 1 : -1;
+      for (let cy = fromY; stepY > 0 ? cy <= toY : cy >= toY; cy += stepY) {
+        putFloor(x, cy);
+        putFloor(x + 1, cy);
+        putIfBlank(x - 1, cy, LEFT);
+        putIfBlank(x + 2, cy, RIGHT);
+      }
+    };
+
+    const wallSideForAnchor = (room: Room, tx: number, ty: number): DungeonWallSide | null => {
+      if (tx === room.left) return "left";
+      if (tx === room.right) return "right";
+      if (ty === room.top) return "top";
+      if (ty === room.bottom) return "bottom";
+      return null;
+    };
+
+    const applyDoorAtAnchor = (room: Room, tx: number, ty: number): void => {
+      const side = wallSideForAnchor(room, tx, ty);
+      if (side === null) return;
+
+      if (side === "left") {
+        const startY = ty - 1;
+        put(tx, startY, 106); // Upper curve
+        putFloor(tx, startY + 1);
+        putFloor(tx, startY + 2);
+        put(tx, startY + 3, 148); // Lower curve
+        return;
+      }
+
+      if (side === "right") {
+        const startY = ty - 1;
+        put(tx, startY, 108); // Upper curve
+        putFloor(tx, startY + 1);
+        putFloor(tx, startY + 2);
+        put(tx, startY + 3, 150); // Lower curve
+        return;
+      }
+
+      const startX = tx - 1;
+      if (side === "top") {
+        put(startX, ty, 106); // Internal curves
+        putFloor(startX + 1, ty);
+        putFloor(startX + 2, ty);
+        put(startX + 3, ty, 108);
+
+        // Body row: clear wall and put floor
+        putFloor(startX, ty + 1);
+        putFloor(startX + 1, ty + 1);
+        putFloor(startX + 2, ty + 1);
+        putFloor(startX + 3, ty + 1);
+        
+        // Ensure cap above the frame is clear or consistent
+        put(startX, ty - 1, tiles.TOP_CAP.CENTER[0].index as number);
+        put(startX + 3, ty - 1, tiles.TOP_CAP.CENTER[0].index as number);
+        return;
+      }
+
+      // bottom
+      put(startX, ty, 148); // Lower internal curves
+      putFloor(startX + 1, ty);
+      putFloor(startX + 2, ty);
+      put(startX + 3, ty, 150);
+
+      putFloor(startX, ty - 1);
+      putFloor(startX + 1, ty - 1);
+      putFloor(startX + 2, ty - 1);
+      putFloor(startX + 3, ty - 1);
+    };
+
+    // Determine corridor direction
+    const isHorizontal = Math.abs(x2 - x1) >= Math.abs(y2 - y1);
+
+    if (isHorizontal) {
+      const stepX = x2 >= x1 ? 1 : -1;
+      const outsideTargetX = x2 - stepX;
+      carveHorizontalLane(x1 + stepX, outsideTargetX, y1);
+
+      if (y1 !== y2) {
+        const stepY = y2 >= y1 ? 1 : -1;
+        carveVerticalLane(outsideTargetX, y1, y2 - stepY);
+      }
+    } else {
+      const stepY = y2 >= y1 ? 1 : -1;
+      const outsideTargetY = y2 - stepY;
+      carveVerticalLane(x1, y1 + stepY, outsideTargetY);
+
+      if (x1 !== x2) {
+        const stepX = x2 >= x1 ? 1 : -1;
+        carveHorizontalLane(x1, x2 - stepX, outsideTargetY);
+      }
+    }
+
+    applyDoorAtAnchor(fromRoom, x1, y1);
+    applyDoorAtAnchor(toRoom, x2, y2);
+  }
+
+
+  private static getRoomLinkAnchors(from: Room, to: Room): { x1: number; y1: number; x2: number; y2: number } {
+    const dx = to.centerX - from.centerX;
+    const dy = to.centerY - from.centerY;
+
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      const y1 = this.clampInteriorY(from, to.centerY);
+      const y2 = this.clampInteriorY(to, y1);
+      const x1 = dx >= 0 ? from.right : from.left;
+      const x2 = dx >= 0 ? to.left : to.right;
+      return { x1, y1, x2, y2 };
+    }
+
+    const x1 = this.clampInteriorX(from, to.centerX);
+    const x2 = this.clampInteriorX(to, x1);
+    const y1 = dy >= 0 ? from.bottom : from.top;
+    const y2 = dy >= 0 ? to.top : to.bottom;
+    return { x1, y1, x2, y2 };
+  }
+
+  private static clampInteriorX(room: Room, value: number): number {
+    const minX = room.left + 1;
+    const maxX = room.right - 2;
+    if (minX > maxX) {
+      return room.centerX;
+    }
+    return Phaser.Math.Clamp(Math.floor(value), minX, maxX);
+  }
+
+  private static clampInteriorY(room: Room, value: number): number {
+    const minY = room.top + 2;
+    const maxY = room.bottom - 2;
+    if (minY > maxY) {
+      return room.centerY;
+    }
+    return Phaser.Math.Clamp(Math.floor(value), minY, maxY);
+  }
+
+  private static pickFarthestRoom(startRoom: Room, rooms: Room[], startIndex: number): Room {
+    let farthest = rooms[startIndex];
+    let farthestDistance = -1;
+
+    for (const room of rooms) {
+      if (room === startRoom) continue;
+      const distance = Math.abs(room.centerX - startRoom.centerX) + Math.abs(room.centerY - startRoom.centerY);
+      if (distance > farthestDistance) {
+        farthestDistance = distance;
+        farthest = room;
+      }
+    }
+
+    return farthest;
+  }
+
   private static pickRoomPlacementTiles(
     room: Room,
     requestedCount: number,
@@ -713,6 +1011,43 @@ export class DungeonGenerator {
     }
 
     return result;
+  }
+
+  private static applyJunctionCorrection(
+    groundLayer: Phaser.Tilemaps.TilemapLayer,
+    dungeon: { width: number; height: number },
+    _tiles: typeof DEFAULT_TILES,
+  ): void {
+    // Neighborhoods:
+    //   ai = above,  bi = below,  li = left,  ri = right
+    for (let ty = 0; ty < dungeon.height; ty++) {
+      for (let tx = 0; tx < dungeon.width; tx++) {
+        const t = groundLayer.getTileAt(tx, ty);
+        if (!t || t.index < 0) continue;
+
+        const above = groundLayer.getTileAt(tx, ty - 1);
+        const below = groundLayer.getTileAt(tx, ty + 1);
+        const left  = groundLayer.getTileAt(tx - 1, ty);
+        const right = groundLayer.getTileAt(tx + 1, ty);
+
+        const ai = above?.index ?? -1;
+        const bi = below?.index ?? -1;
+
+        const isTopWall    = (i: number) => i === 2 || i === 3 || i === 4;
+        const isBottomWall = (i: number) => i === 169 || i === 170 || i === 171;
+
+        // T-junction: right wall drops onto roof
+        if (t.index === 150 && ai === 130 && isTopWall(bi)) {
+          groundLayer.putTileAt(108, tx, ty);
+        } else if (t.index === 169 && ai === 126 && isTopWall(bi)) {
+          groundLayer.putTileAt(106, tx, ty);
+        } else if (t.index === 150 && ai === 130 && isBottomWall(bi)) {
+          groundLayer.putTileAt(108, tx, ty);
+        } else if (t.index === 169 && ai === 126 && isBottomWall(bi)) {
+          groundLayer.putTileAt(106, tx, ty);
+        }
+      }
+    }
   }
 }
 

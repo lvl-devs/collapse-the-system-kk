@@ -114,6 +114,12 @@ export const GameData: GameDataType = {
         maxRooms: 12,
         maxArea: 150,
       },
+      layout: {
+        mode: "hub",
+        roomCount: 5,
+        hubIndex: 0,
+        links: [[0, 1], [0, 2], [0, 3], [0, 4]],
+      },
       placement: {
         stairs: {
           roomRole: "end",

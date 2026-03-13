@@ -10,7 +10,7 @@ import Options from "./game/scenes/Options";
 import Credits from "./game/scenes/Credits";
 import PauseMenu from "./game/scenes/PauseMenu";
 import Introduction from "./game/scenes/CutScenes/Introduction";
-import Scena1 from "./game/scenes/CutScenes/scena-1";
+import Scena1 from "./game/scenes/CutScenes/Scena-1";
 
 window.addEventListener("load", () => {
   const config: Phaser.Types.Core.GameConfig = {

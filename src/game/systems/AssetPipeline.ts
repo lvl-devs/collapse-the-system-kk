@@ -15,9 +15,7 @@ export default class AssetPipeline {
   }
 
   static startDeferredPreload(scene: Phaser.Scene): void {
-    if (this.deferredStarted) {
-      return;
-    }
+    if (this.deferredStarted) return;
 
     this.deferredStarted = true;
     this.loadAssets(scene, "deferred");

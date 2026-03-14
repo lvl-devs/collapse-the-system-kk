@@ -11,6 +11,16 @@ const PLAYER_SPEED = 125;
 const STEP_SFX_KEY = "step-sfx";
 const STEP_SFX_RATE = 1.1;
 const OBJECT_TOP_DEPTH = 1000;
+const DOOR_INTERACT_DISTANCE = 72;
+const DOOR_HINT_TEXT = "Premi B per aprire";
+const DOOR_OBJECT_OPEN_BY_CLOSED: Record<string, string> = {
+  "door": "door-open",
+  "door-closed": "door-open",
+  "left-side-doors-closed": "left-side-doors-open",
+  "right-side-doors-closed": "right-side-doors-open",
+  "left-side-door-closed": "left-side-door-open",
+  "right-side-door-closed": "right-side-door-open",
+};
 
 export default class GamePlay extends Phaser.Scene {
   private static readonly LEVEL_MUSIC_BY_LEVEL: Record<number, string> = {
@@ -28,6 +38,11 @@ export default class GamePlay extends Phaser.Scene {
   private pausedSfxDuringPause: Phaser.Sound.BaseSound[] = [];
   private isAudioPausedForMenu = false;
   private isStepSfxPlaying = false;
+  private doorInteractKey?: Phaser.Input.Keyboard.Key;
+  private doorLayers: Phaser.Tilemaps.TilemapLayer[] = [];
+  private closedToOpenDoorIndex = new Map<number, number>();
+  private doorObjectEntries: Array<{ sprite: Phaser.GameObjects.Sprite; openTextureKey: string }> = [];
+  private doorHintText?: Phaser.GameObjects.Text;
 
   private resolveTextureKeyFromImage(imageName: string, fallbackKey: string): string {
     const fileName = imageName.split(/[/\\]/).pop() ?? "";
@@ -92,6 +107,166 @@ export default class GamePlay extends Phaser.Scene {
     super({ key: "GamePlay" });
   }
 
+  private configureDoorInteractions(
+    map: Phaser.Tilemaps.Tilemap,
+    layers: Phaser.Tilemaps.TilemapLayer[],
+  ): void {
+    const doorTileset = map.tilesets.find((tileset) => tileset.name.toLowerCase() === "doors");
+    if (!doorTileset) {
+      this.doorLayers = [];
+      this.closedToOpenDoorIndex.clear();
+      return;
+    }
+
+    const firstgid = doorTileset.firstgid;
+    const closedToOpen = new Map<number, number>([
+      [firstgid + 0, firstgid + 1],
+      [firstgid + 2, firstgid + 1],
+      [firstgid + 3, firstgid + 4],
+      [firstgid + 5, firstgid + 6],
+    ]);
+
+    const closedIndices = Array.from(closedToOpen.keys());
+    const openIndices = Array.from(new Set(closedToOpen.values()));
+
+    this.closedToOpenDoorIndex = closedToOpen;
+    this.doorLayers = layers.filter((layer) => layer.layer.name.toLowerCase().includes("door"));
+
+    this.doorLayers.forEach((layer) => {
+      layer.setCollision(closedIndices, true, true);
+      layer.setCollision(openIndices, false, true);
+    });
+  }
+
+  private tryOpenNearbyDoor(): void {
+    if (
+      (this.doorLayers.length === 0 || this.closedToOpenDoorIndex.size === 0)
+      && this.doorObjectEntries.length === 0
+    ) {
+      return;
+    }
+
+    const nearbyDoor = this.findNearestClosedDoorCandidate();
+    if (!nearbyDoor) {
+      return;
+    }
+
+    if (nearbyDoor.kind === "object") {
+      nearbyDoor.entry.sprite.setTexture(nearbyDoor.entry.openTextureKey);
+      const body = nearbyDoor.entry.sprite.body as Phaser.Physics.Arcade.Body | undefined;
+      if (body) {
+        body.enable = false;
+      }
+      return;
+    }
+
+    const nextIndex = this.closedToOpenDoorIndex.get(nearbyDoor.tile.index);
+    if (nextIndex == null) {
+      return;
+    }
+
+    nearbyDoor.layer.putTileAt(nextIndex, nearbyDoor.tile.x, nearbyDoor.tile.y, true);
+
+    const updatedTile = nearbyDoor.layer.getTileAt(nearbyDoor.tile.x, nearbyDoor.tile.y, true);
+    if (updatedTile) {
+      updatedTile.setCollision(false, false, false, false);
+    }
+
+    nearbyDoor.layer.calculateFacesWithin(nearbyDoor.tile.x, nearbyDoor.tile.y, 1, 1);
+  }
+
+  private findNearestClosedDoorCandidate():
+    | {
+        kind: "tile";
+        layer: Phaser.Tilemaps.TilemapLayer;
+        tile: Phaser.Tilemaps.Tile;
+        distance: number;
+      }
+    | {
+        kind: "object";
+        entry: { sprite: Phaser.GameObjects.Sprite; openTextureKey: string };
+        distance: number;
+      }
+    | undefined {
+    const player = this.playerController.sprite;
+    let bestTileCandidate:
+      | {
+          kind: "tile";
+          layer: Phaser.Tilemaps.TilemapLayer;
+          tile: Phaser.Tilemaps.Tile;
+          distance: number;
+        }
+      | undefined;
+
+    this.doorLayers.forEach((layer) => {
+      layer.forEachTile((tile) => {
+        if (!this.closedToOpenDoorIndex.has(tile.index)) {
+          return;
+        }
+
+        const distance = Phaser.Math.Distance.Between(player.x, player.y, tile.getCenterX(), tile.getCenterY());
+        if (distance > DOOR_INTERACT_DISTANCE) {
+          return;
+        }
+
+        if (!bestTileCandidate || distance < bestTileCandidate.distance) {
+          bestTileCandidate = { kind: "tile", layer, tile, distance };
+        }
+      });
+    });
+
+    let bestObjectCandidate:
+      | {
+          kind: "object";
+          entry: { sprite: Phaser.GameObjects.Sprite; openTextureKey: string };
+          distance: number;
+        }
+      | undefined;
+
+    this.doorObjectEntries.forEach((entry) => {
+      const body = entry.sprite.body as Phaser.Physics.Arcade.Body | undefined;
+      const isStillClosed = body != null && body.enable;
+      if (!isStillClosed) {
+        return;
+      }
+
+      const distance = Phaser.Math.Distance.Between(player.x, player.y, entry.sprite.x, entry.sprite.y);
+      if (distance > DOOR_INTERACT_DISTANCE) {
+        return;
+      }
+
+      if (!bestObjectCandidate || distance < bestObjectCandidate.distance) {
+        bestObjectCandidate = { kind: "object", entry, distance };
+      }
+    });
+
+    if (!bestTileCandidate) {
+      return bestObjectCandidate;
+    }
+
+    if (!bestObjectCandidate) {
+      return bestTileCandidate;
+    }
+
+    return bestObjectCandidate.distance < bestTileCandidate.distance ? bestObjectCandidate : bestTileCandidate;
+  }
+
+  private updateDoorHintPopup(): void {
+    if (!this.doorHintText || !this.playerController) {
+      return;
+    }
+
+    const nearbyDoor = this.findNearestClosedDoorCandidate();
+    if (!nearbyDoor) {
+      this.doorHintText.setVisible(false);
+      return;
+    }
+
+    this.doorHintText.setVisible(true);
+    // Position popup over player's head
+    this.doorHintText.setPosition(this.playerController.sprite.x, this.playerController.sprite.y - 45);
+  }
+
   preload() {
     AssetPipeline.startDeferredPreload(this);
   }
@@ -111,10 +286,14 @@ export default class GamePlay extends Phaser.Scene {
     const TS_MAP: Record<string, string> = {
       "home": "tileset-cyber",
       "airport": "airport",
+      "doors": "door-closed",
     };
 
     const mapData = MapProcessor.processMap(this, "static-map", TS_MAP);
     const { map, layers, rawObjectLayers, spawnX, spawnY, minX, minY, maxX, maxY } = mapData;
+
+    this.configureDoorInteractions(map, layers);
+    this.doorObjectEntries = [];
 
     console.log(`[Spawn Debug] Bounds: [${minX}, ${minY}] to [${maxX}, ${maxY}]`);
     console.log(`[Spawn Debug] Spawn finale: (${spawnX}, ${spawnY})`);
@@ -205,12 +384,17 @@ export default class GamePlay extends Phaser.Scene {
                     const sprite = this.add.sprite(obj.x!, obj.y!, textureKey, frame);
                     sprite.setOrigin(0, 1);
                     sprite.setFlip(flipX, flipY);
+
+                    const objectDoorOpenTexture = DOOR_OBJECT_OPEN_BY_CLOSED[textureKey];
+                    if (objectDoorOpenTexture && this.textures.exists(objectDoorOpenTexture)) {
+                      this.doorObjectEntries.push({ sprite, openTextureKey: objectDoorOpenTexture });
+                    }
                     
                     // console.log(`[Object Spawned] ${textureKey} at (${obj.x}, ${obj.y})`);
 
                     // Gestione depth e collisioni dinamiche
                     sprite.setDepth(OBJECT_TOP_DEPTH);
-                    const hasCollision = MapProcessor.getProperty(obj, "collision") !== false;
+                    const hasCollision = objectDoorOpenTexture != null || MapProcessor.getProperty(obj, "collision") !== false;
                     if (hasCollision) {
                         this.physics.add.existing(sprite, false);
                         if (sprite.body) {
@@ -244,7 +428,21 @@ export default class GamePlay extends Phaser.Scene {
 
     this.escPauseKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
     this.collisionDebugKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.C);
+    this.doorInteractKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.B);
     this.escPauseKey?.on("down", this.openPauseMenu, this);
+
+    this.doorHintText = this.add
+      .text(this.cameras.main.width / 2, this.cameras.main.height - 72, DOOR_HINT_TEXT, {
+        fontFamily: GameData.globals.defaultFont.key,
+        fontSize: "24px",
+        color: "#ffffff",
+        backgroundColor: "#000000aa",
+        padding: { x: 12, y: 6 },
+      })
+      .setScrollFactor(0)
+      .setOrigin(0.5, 0.5)
+      .setDepth(1001)
+      .setVisible(false);
 
     this.add
       .text(100, 75, "Agency", {
@@ -263,6 +461,12 @@ export default class GamePlay extends Phaser.Scene {
       this.escPauseKey?.off("down", this.openPauseMenu, this);
       this.escPauseKey = undefined;
       this.collisionDebugKey = undefined;
+      this.doorInteractKey = undefined;
+      this.doorLayers = [];
+      this.closedToOpenDoorIndex.clear();
+      this.doorObjectEntries = [];
+      this.doorHintText?.destroy();
+      this.doorHintText = undefined;
       this.tileDebugGraphics?.destroy();
       this.stopStepSfx();
     });
@@ -277,6 +481,13 @@ export default class GamePlay extends Phaser.Scene {
 
     if (this.collisionDebugKey != null && Phaser.Input.Keyboard.JustDown(this.collisionDebugKey)) {
       this.toggleCollisionDebug();
+    }
+
+    this.updateDoorHintPopup();
+
+    if (this.doorInteractKey != null && Phaser.Input.Keyboard.JustDown(this.doorInteractKey)) {
+      this.tryOpenNearbyDoor();
+      this.updateDoorHintPopup();
     }
 
     this.playerController.update();

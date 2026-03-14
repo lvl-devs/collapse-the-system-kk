@@ -1,4 +1,6 @@
 import Phaser from "phaser";
+import { GameData } from "../../GameData";
+import SfxManager from "../audio/SfxManager";
 
 type ArrowKey = "UP" | "DOWN" | "LEFT" | "RIGHT";
 
@@ -23,8 +25,10 @@ export default class Minigame2 extends Phaser.Scene {
   private readonly MONITOR_W = 360;
   private readonly MONITOR_H = 168;
 
-  private readonly PAD_CX = 549;
+  private readonly PAD_CX = 569;
   private readonly PAD_CY = 312;
+  private readonly PAD_SHIFT_X = -18;
+  private readonly SEQUENCE_SHIFT_X = 17;
   private readonly PAD_BTN_OFFSET_X = 25;
   private readonly PAD_BTN_OFFSET_Y = 23;
 
@@ -81,6 +85,16 @@ export default class Minigame2 extends Phaser.Scene {
       frameWidth: 32,
       frameHeight: 32
     });
+
+    if (!this.cache.audio.exists("phrase-successful")) {
+      this.load.audio("phrase-successful", "../assets/sounds/minigame-4/phrase-correct.mp3");
+    }
+    if (!this.cache.audio.exists("loading-complete")) {
+      this.load.audio("loading-complete", "../assets/sounds/loading-complete.mp3");
+    }
+    if (!this.cache.audio.exists("error-1")) {
+      this.load.audio("error-1", "../assets/sounds/minigame-3/error-1.mp3");
+    }
   }
 
   create() {
@@ -244,7 +258,7 @@ export default class Minigame2 extends Phaser.Scene {
   const gap = this.ui(8);
   const iconSize = this.ui(26);
   const totalW = maxSlots * iconSize + (maxSlots - 1) * gap;
-  const startX = 783 - totalW / 2 + iconSize / 2;
+  const startX = cx + this.s(this.SEQUENCE_SHIFT_X) - totalW / 2 + iconSize / 2;
   const y = cy + this.ui(70);
 
   for (let i = 0; i < maxSlots; i++) {
@@ -278,7 +292,7 @@ export default class Minigame2 extends Phaser.Scene {
   }
 
   private createPadButtons() {
-    const padCX = this.ax(this.PAD_CX);
+    const padCX = this.ax(this.PAD_CX) + this.s(this.PAD_SHIFT_X);
     const padCY = this.ay(this.PAD_CY);
 
     const dx = this.s(this.PAD_BTN_OFFSET_X);
@@ -382,6 +396,10 @@ export default class Minigame2 extends Phaser.Scene {
           return;
         }
 
+        SfxManager.start(this, "phrase-successful", {
+          volume: GameData.sfxVolume ?? 0.7,
+        });
+
         this.time.delayedCall(220, () => {
           this.generateSequence();
           this.updateSequenceUI();
@@ -393,6 +411,9 @@ export default class Minigame2 extends Phaser.Scene {
       this.updateProgressUI();
       this.showStatus("ACCESS DENIED");
       this.cameras.main.shake(110, 0.0038);
+      SfxManager.start(this, "error-1", {
+        volume: GameData.sfxVolume ?? 0.7,
+      });
 
       this.generateSequence();
       this.updateSequenceUI();
@@ -531,6 +552,9 @@ export default class Minigame2 extends Phaser.Scene {
     const cy = this.ay(this.MONITOR_CY);
 
     this.registry.set("task2Completed", true);
+    SfxManager.start(this, "loading-complete", {
+      volume: GameData.sfxVolume ?? 0.7,
+    });
 
     const display = this.add
       .image(cx, cy + this.s(12), "mg2_display")

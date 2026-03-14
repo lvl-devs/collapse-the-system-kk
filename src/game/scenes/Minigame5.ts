@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { GameData } from "../../GameData";
+import SfxManager from "../audio/SfxManager";
 
 type BagKind = "normal" | "suspect" | "bomb";
 
@@ -108,6 +109,15 @@ export default class Minigame5 extends Phaser.Scene {
     this.load.image("mg5-bag-red", "images/minigame-5/suitcase-red.png");
     this.load.image("mg5-bag-bomb", "images/minigame-5/suitcase-bomb.png");
     this.load.audio("mg5-conveyor-move-sfx", "sounds/minigame-5/conveyor-belt.mp3");
+    if (!this.cache.audio.exists("phrase-correct")) {
+      this.load.audio("phrase-correct", "sounds/minigame-4/phrase-correct.mp3");
+    }
+    if (!this.cache.audio.exists("error-1")) {
+      this.load.audio("error-1", "sounds/minigame-3/error-1.mp3");
+    }
+    if (!this.cache.audio.exists("loading-complete")) {
+      this.load.audio("loading-complete", "sounds/loading-complete.mp3");
+    }
   }
 
   create(): void {
@@ -401,6 +411,10 @@ export default class Minigame5 extends Phaser.Scene {
       return;
     }
 
+    SfxManager.start(this, "phrase-correct", {
+      volume: GameData.sfxVolume ?? 0.7,
+    });
+
     if (action === "stop") {
       this.xrayTween?.stop();
       if (!this.xrayPreview) {
@@ -476,6 +490,10 @@ export default class Minigame5 extends Phaser.Scene {
     this.stopButton?.disableInteractive();
     this.passButton?.disableInteractive();
 
+    SfxManager.start(this, "error-1", {
+      volume: GameData.sfxVolume ?? 0.7,
+    });
+
     this.showFailureScreen(msg);
   }
 
@@ -536,6 +554,10 @@ export default class Minigame5 extends Phaser.Scene {
     if (this.xrayPreview) {
       this.xrayPreview.setVisible(false).clearTint().setAlpha(1);
     }
+
+    SfxManager.start(this, "loading-complete", {
+      volume: GameData.sfxVolume ?? 0.7,
+    });
 
     this.showSuccessScreen();
   }

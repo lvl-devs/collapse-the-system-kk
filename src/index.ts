@@ -1,6 +1,7 @@
 import "phaser";
 import { GameData } from "./GameData";
 
+import Intro from "./game/scenes/Intro";
 import Preloader from "./game/scenes/Preloader";
 import Boot from "./game/scenes/Boot";
 import Menu from "./game/scenes/Menu";
@@ -23,6 +24,7 @@ window.addEventListener("load", () => {
       height: window.innerHeight,
     },
     scene: [
+      Intro,
       Preloader,
       Boot,
       MenuBackdrop,

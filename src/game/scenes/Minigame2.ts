@@ -316,33 +316,39 @@ export default class Minigame2 extends Phaser.Scene {
   }
 
   private createCloseButton() {
-    const x = this.ax(652);
-    const y = this.ay(40);
 
-    const txt = this.add
-      .text(x, y, "x", {
-        fontFamily: "Pixelify Sans",
-        fontSize: `${Math.max(34, Math.round(this.s(14)))}px`,
-        color: "#ffffff"
-      })
-      .setOrigin(0.5)
-      .setDepth(10)
-      .setInteractive({ useHandCursor: true });
+  const cx = this.ax(this.MONITOR_CX);
+  const cy = this.ay(this.MONITOR_CY);
+  const mw = this.s(this.MONITOR_W);
+  const mh = this.s(this.MONITOR_H);
 
-    txt.on("pointerover", () => {
-      txt.setScale(1.15);
-    });
+  const x = cx + mw / 2 - this.s(-100);
+  const y = cy - mh / 2 + this.s(-10);
 
-    txt.on("pointerout", () => {
-      txt.setScale(1);
-    });
+  const txt = this.add
+    .text(x, y, "x", {
+      fontFamily: "Pixelify Sans",
+      fontSize: `${Math.round(this.s(25))}px`,
+      color: "#ffffff",
+    })
+    .setOrigin(0.5)
+    .setDepth(100)
+    .setInteractive({ useHandCursor: true });
 
-    txt.on("pointerdown", () => {
-      this.input.keyboard?.off("keydown", this.handleKeyPress, this);
-      this.scene.stop();
-      this.scene.resume("GamePlay");
-    });
-  }
+  txt.on("pointerover", () => {
+    txt.setScale(1.2);
+  });
+
+  txt.on("pointerout", () => {
+    txt.setScale(1);
+  });
+
+  txt.on("pointerdown", () => {
+    this.input.keyboard?.off("keydown", this.handleKeyPress, this);
+    this.scene.stop();
+    this.scene.resume("GamePlay");
+  });
+}
 
   private handleKeyPress(event: KeyboardEvent) {
     if (!this.acceptingInput) return;

@@ -224,16 +224,16 @@ export default class GamePlay extends Phaser.Scene {
     this.collisionDebugKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.C);
     this.escPauseKey?.on("down", this.openPauseMenu, this);
 
-    /* this.add
-      .text(16, 16, `Level: ${this.currentLevel}\nESC -> Menu | C -> Debug Collisioni`, {
+    this.add
+      .text(100, 75, "Agency", {
         fontFamily: GameData.globals.defaultFont.key,
-        fontSize: "14px",
-        color: "#aaaacc",
-        backgroundColor: "#00000088",
+        fontSize: "35px",
+        color: "#fff",
+        backgroundColor: "#00000020",
         padding: { x: 8, y: 4 },
       })
       .setScrollFactor(0)
-      .setDepth(100); */
+      .setDepth(100);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.events.off(Phaser.Scenes.Events.PAUSE, this.pauseCurrentLevelAudio, this);

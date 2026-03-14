@@ -447,6 +447,7 @@
                 {
                  "draworder":"topdown",
                  "id":7,
+                 "locked":true,
                  "name":"computer-desk",
                  "objects":[
                         {
@@ -482,6 +483,7 @@
                 {
                  "draworder":"topdown",
                  "id":6,
+                 "locked":true,
                  "name":"computers",
                  "objects":[
                         {
@@ -537,6 +539,7 @@
         {
          "draworder":"topdown",
          "id":9,
+         "locked":true,
          "name":"other-objects",
          "objects":[
                 {
@@ -861,8 +864,17 @@
  "tileheight":32,
  "tilesets":[
         {
+        "columns":21,
          "firstgid":1,
-         "source":"collapse-ts-home.tsx"
+        "image":"home.png",
+        "imageheight":352,
+        "imagewidth":672,
+        "margin":0,
+        "name":"home",
+        "spacing":0,
+        "tilecount":231,
+        "tileheight":32,
+        "tilewidth":32
         }, 
         {
          "columns":0,
@@ -881,19 +893,19 @@
          "tiles":[
                 {
                  "id":0,
-                 "image":"..\/Development\/lvl-devs\/collapse-the-system\/src\/assets\/tilemaps\/other-objects\/server-rack-open.png",
+                 "image":"other-objects\/server-rack-open.png",
                  "imageheight":64,
                  "imagewidth":32
                 }, 
                 {
                  "id":1,
-                 "image":"..\/Development\/lvl-devs\/collapse-the-system\/src\/assets\/tilemaps\/other-objects\/server-rack-closed.png",
+                 "image":"other-objects\/server-rack-closed.png",
                  "imageheight":64,
                  "imagewidth":32
                 }, 
                 {
                  "id":2,
-                 "image":"..\/Downloads\/fire-extinguisher.png",
+                 "image":"other-objects\/fire-extinguisher.png",
                  "imageheight":64,
                  "imagewidth":32
                 }],
@@ -916,43 +928,43 @@
          "tiles":[
                 {
                  "id":0,
-                 "image":"..\/Development\/lvl-devs\/collapse-the-system\/src\/assets\/tilemaps\/doors\/front\/door-closed.png",
+                 "image":"doors\/front\/door-closed.png",
                  "imageheight":64,
                  "imagewidth":64
                 }, 
                 {
                  "id":1,
-                 "image":"..\/Development\/lvl-devs\/collapse-the-system\/src\/assets\/tilemaps\/doors\/front\/door-open.png",
+                 "image":"doors\/front\/door-open.png",
                  "imageheight":64,
                  "imagewidth":64
                 }, 
                 {
                  "id":2,
-                 "image":"..\/Development\/lvl-devs\/collapse-the-system\/src\/assets\/tilemaps\/doors\/front\/door.png",
+                 "image":"doors\/front\/door.png",
                  "imageheight":64,
                  "imagewidth":64
                 }, 
                 {
                  "id":3,
-                 "image":"..\/Development\/lvl-devs\/collapse-the-system\/src\/assets\/tilemaps\/doors\/side\/left-side-doors-closed.png",
+                 "image":"doors\/side\/left-side-doors-closed.png",
                  "imageheight":64,
                  "imagewidth":32
                 }, 
                 {
                  "id":4,
-                 "image":"..\/Development\/lvl-devs\/collapse-the-system\/src\/assets\/tilemaps\/doors\/side\/left-side-doors-open.png",
+                 "image":"doors\/side\/left-side-doors-open.png",
                  "imageheight":64,
                  "imagewidth":32
                 }, 
                 {
                  "id":5,
-                 "image":"..\/Development\/lvl-devs\/collapse-the-system\/src\/assets\/tilemaps\/doors\/side\/right-side-doors-closed.png",
+                 "image":"doors\/side\/right-side-doors-closed.png",
                  "imageheight":64,
                  "imagewidth":32
                 }, 
                 {
                  "id":6,
-                 "image":"..\/Development\/lvl-devs\/collapse-the-system\/src\/assets\/tilemaps\/doors\/side\/right-side-doors-open.png",
+                 "image":"doors\/side\/right-side-doors-open.png",
                  "imageheight":64,
                  "imagewidth":32
                 }],

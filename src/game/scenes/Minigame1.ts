@@ -1,4 +1,6 @@
 import Phaser from "phaser";
+import { GameData } from "../../GameData";
+import SfxManager from "../audio/SfxManager";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Side = "left" | "right" | "top" | "bottom";
@@ -100,6 +102,16 @@ export default class Minigame1 extends Phaser.Scene {
     this.bgKey,
     "../assets/images/minigame1/bg-min1.png"
   );
+
+  if (!this.cache.audio.exists("error-2")) {
+    this.load.audio("error-2", "../assets/sounds/minigame-1/error-2.mp3");
+  }
+  if (!this.cache.audio.exists("wire-connection")) {
+    this.load.audio("wire-connection", "../assets/sounds/minigame-1/wire-connecting.mp3");
+  }
+  if (!this.cache.audio.exists("loading-complete")) {
+    this.load.audio("loading-complete", "../assets/sounds/loading-complete.mp3");
+  }
 
 }
 
@@ -854,10 +866,17 @@ private drawBackground() {
       yoyo: true
     });
 
+    SfxManager.start(this, "wire-connection", {
+      volume: GameData.sfxVolume ?? 0.7,
+    });
+
     this.checkWin();
   } else {
     this.showAlert("ERROR: WRONG CONNECTION", 300);
     this.cameras.main.shake(120, 0.004);
+    SfxManager.start(this, "error-2", {
+      volume: GameData.sfxVolume ?? 0.7,
+    });
 
     this.vibrateWrongWire(wire, () => {
       this.returnWire(wire);
@@ -893,6 +912,9 @@ private drawBackground() {
   if (!this.wires.every(w => w.connected)) return;
 
   this.registry.set("task1Completed", true);
+  SfxManager.start(this, "loading-complete", {
+    volume: GameData.sfxVolume ?? 0.7,
+  });
 
   // blocca input
   this.input.enabled = false;

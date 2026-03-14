@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import LevelStorage from "../systems/LevelStorage";
 
 export default class Scene3 extends Phaser.Scene {
 
@@ -21,6 +22,7 @@ export default class Scene3 extends Phaser.Scene {
     }
 
     create(){
+        LevelStorage.markLoreSceneSeen("Scene3");
 
         const {width,height} = this.scale;
 

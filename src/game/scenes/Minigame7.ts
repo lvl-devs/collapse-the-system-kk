@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import LevelStorage from "../systems/LevelStorage";
 
 type FlightData = {
   code: string;
@@ -600,6 +601,7 @@ if (isSelected) {
     this.input.keyboard?.off("keydown", this.handleKeyPress, this);
 
     this.registry.set("task7Completed", true);
+    LevelStorage.setCurrentLevel(Math.max(LevelStorage.getCurrentLevel() + 1, 7));
 
     this.hideUI();
 

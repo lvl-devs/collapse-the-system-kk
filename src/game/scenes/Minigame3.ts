@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { GameData } from "../../GameData";
 import SfxManager from "../audio/SfxManager";
+import LevelStorage from "../systems/LevelStorage";
 
 type BitCell = {
   row: number;
@@ -570,6 +571,7 @@ export default class Minigame3 extends Phaser.Scene {
     this.progress = 100;
     this.updateProgressUI();
     this.registry.set("task3Completed", true);
+    LevelStorage.advanceLevel();
     SfxManager.start(this, "loading-complete", {
       volume: GameData.sfxVolume ?? 0.7,
     });

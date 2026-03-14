@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import LevelStorage from "../systems/LevelStorage";
 
 export default class Scene2 extends Phaser.Scene {
 
@@ -67,6 +68,7 @@ Una volta in aria, il piano entrerà nella seconda fase.`,
     }
 
     create(){
+        LevelStorage.markLoreSceneSeen("Scene2");
 
         const {width,height} = this.scale;
 

@@ -27,6 +27,12 @@ export default class GamePlay extends Phaser.Scene {
     1: "level-1-theme",
   };
 
+  private static readonly LORE_SCENE_BY_LEVEL: Array<{ level: number; sceneKey: string }> = [
+    { level: 4, sceneKey: "Scene1" },
+    { level: 7, sceneKey: "Scene2" },
+    { level: 9, sceneKey: "Scene3" },
+  ];
+
   private playerController!: CharacterController;
   private hasPlayerReachedStairs = false;
   private currentLevel = 1;
@@ -110,6 +116,41 @@ export default class GamePlay extends Phaser.Scene {
 
   constructor() {
     super({ key: "GamePlay" });
+  }
+
+  private syncCurrentLevelFromStorage(): void {
+    this.currentLevel = LevelStorage.getCurrentLevel();
+  }
+
+  private getPendingLoreSceneKey(level: number): string | undefined {
+    const sortedMilestones = [...GamePlay.LORE_SCENE_BY_LEVEL].sort((a, b) => a.level - b.level);
+    const pending = sortedMilestones.find(
+      ({ level: threshold, sceneKey }) => level >= threshold && !LevelStorage.hasSeenLoreScene(sceneKey)
+    );
+    return pending?.sceneKey;
+  }
+
+  private startPendingLoreSceneIfNeeded(): boolean {
+    const loreScene = this.getPendingLoreSceneKey(this.currentLevel);
+    if (!loreScene) {
+      return false;
+    }
+
+    LevelStorage.markLoreSceneSeen(loreScene);
+    this.stopStepSfx();
+    if (this.currentLevelMusicKey) {
+      MusicManager.stop(this, this.currentLevelMusicKey);
+    }
+    this.scene.start(loreScene);
+    return true;
+  }
+
+  private handleSceneResume(): void {
+    this.syncCurrentLevelFromStorage();
+    if (this.startPendingLoreSceneIfNeeded()) {
+      return;
+    }
+    this.resumeCurrentLevelMusic();
   }
 
   private configureDoorInteractions(
@@ -371,12 +412,17 @@ export default class GamePlay extends Phaser.Scene {
   create() {
     this.input.keyboard?.resetKeys();
 
-    this.currentLevel = LevelStorage.getCurrentLevel();
+    this.syncCurrentLevelFromStorage();
+
+    if (this.startPendingLoreSceneIfNeeded()) {
+      return;
+    }
+
     this.hasPlayerReachedStairs = false;
     this.startLevelMusic(this.currentLevel);
 
     this.events.on(Phaser.Scenes.Events.PAUSE, this.pauseCurrentLevelAudio, this);
-    this.events.on(Phaser.Scenes.Events.RESUME, this.resumeCurrentLevelMusic, this);
+    this.events.on(Phaser.Scenes.Events.RESUME, this.handleSceneResume, this);
 
     // Mappatura tileset standard (opzionale, MapProcessor prova a indovinare)
     // Mappatura tileset standard
@@ -594,7 +640,7 @@ export default class GamePlay extends Phaser.Scene {
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.events.off(Phaser.Scenes.Events.PAUSE, this.pauseCurrentLevelAudio, this);
-      this.events.off(Phaser.Scenes.Events.RESUME, this.resumeCurrentLevelMusic, this);
+      this.events.off(Phaser.Scenes.Events.RESUME, this.handleSceneResume, this);
       this.escPauseKey?.off("down", this.openPauseMenu, this);
       this.escPauseKey = undefined;
       this.collisionDebugKey = undefined;

@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { GameData } from "../../GameData";
 import SfxManager from "../audio/SfxManager";
+import LevelStorage from "../systems/LevelStorage";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Side = "left" | "right" | "top" | "bottom";
@@ -923,6 +924,7 @@ private drawBackground() {
   if (!this.wires.every(w => w.connected)) return;
 
   this.registry.set("task1Completed", true);
+  LevelStorage.advanceLevel();
   SfxManager.start(this, "loading-complete", {
     volume: GameData.sfxVolume ?? 0.7,
   });

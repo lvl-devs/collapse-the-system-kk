@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { GameData } from "../../GameData";
 import SfxManager from "../audio/SfxManager";
+import LevelStorage from "../systems/LevelStorage";
 
 type BagKind = "normal" | "suspect" | "bomb";
 
@@ -586,6 +587,7 @@ exitX.on("pointerout", () => exitX.setScale(1));
     SfxManager.start(this, "loading-complete", {
       volume: GameData.sfxVolume ?? 0.7,
     });
+    LevelStorage.advanceLevel();
 
     this.showSuccessScreen();
   }

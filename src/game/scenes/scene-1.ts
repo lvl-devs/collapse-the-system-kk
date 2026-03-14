@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import LevelStorage from "../systems/LevelStorage";
 
 export default class Scene1 extends Phaser.Scene {
 
@@ -46,6 +47,7 @@ agente della sicurezza  nell’aeroporto.
     }
 
     create(){
+        LevelStorage.markLoreSceneSeen("Scene1");
 
         const {width,height} = this.scale;
 

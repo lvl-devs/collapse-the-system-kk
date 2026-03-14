@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { GameData } from "../../GameData";
 import SfxManager from "../audio/SfxManager";
+import LevelStorage from "../systems/LevelStorage";
 
 type ArrowKey = "UP" | "DOWN" | "LEFT" | "RIGHT";
 
@@ -554,6 +555,7 @@ export default class Minigame2 extends Phaser.Scene {
     const cy = this.ay(this.MONITOR_CY);
 
     this.registry.set("task2Completed", true);
+    LevelStorage.advanceLevel();
     SfxManager.start(this, "loading-complete", {
       volume: GameData.sfxVolume ?? 0.7,
     });

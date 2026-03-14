@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import LevelStorage from "../systems/LevelStorage";
 
 type FrequencyData = {
   value: number;
@@ -458,8 +459,7 @@ private dotH = 0;
     this.isLocked = true;
 
     this.frequencyTimer?.remove(false);
-
-
+    LevelStorage.setCurrentLevel(Math.max(LevelStorage.getCurrentLevel(), 9));
 
     if (this.infoText) {
       this.infoText.setText("SUCCESS");
@@ -467,6 +467,11 @@ private dotH = 0;
     }
 
     if (this.timerBarFill) this.timerBarFill.width = 0;
+
+    this.time.delayedCall(1200, () => {
+      this.scene.stop();
+      this.scene.resume("GamePlay");
+    });
   }
 
   private flashButton(target?: Phaser.GameObjects.Image) {

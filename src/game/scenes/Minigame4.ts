@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { GameData } from "../../GameData";
 import SfxManager from "../audio/SfxManager";
+import LevelStorage from "../systems/LevelStorage";
 
 type PuzzleData = {
   fullText: string;
@@ -567,6 +568,7 @@ export default class Minigame4 extends Phaser.Scene {
     this.progress = 100;
     this.updateProgressUI();
     this.registry.set("task4Completed", true);
+    LevelStorage.setCurrentLevel(Math.max(LevelStorage.getCurrentLevel() + 1, 4));
     SfxManager.start(this, "loading-complete", {
       volume: GameData.sfxVolume ?? 0.7,
     });

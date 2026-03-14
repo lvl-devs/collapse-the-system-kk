@@ -10,7 +10,6 @@ import Options from "./game/scenes/Options";
 import Credits from "./game/scenes/Credits";
 import PauseMenu from "./game/scenes/PauseMenu";
 import Introduction from "./game/scenes/CutScenes/Introduction";
-import Scena1 from "./game/scenes/CutScenes/Scena-1";
 import Scene1 from "./game/scenes/scene-1";
 import Scene2 from "./game/scenes/scene-2";
 import Scene3 from "./game/scenes/scene-3";
@@ -39,7 +38,6 @@ window.addEventListener("load", () => {
       Credits,
       PauseMenu,
       Introduction,
-      Scena1,
       Scene1,
       Scene2,
       Scene3,

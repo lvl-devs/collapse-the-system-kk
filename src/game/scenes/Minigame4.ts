@@ -1,4 +1,6 @@
 import Phaser from "phaser";
+import { GameData } from "../../GameData";
+import SfxManager from "../audio/SfxManager";
 
 type PuzzleData = {
   fullText: string;
@@ -74,6 +76,15 @@ export default class Minigame4 extends Phaser.Scene {
 
   constructor() {
     super("Minigame4");
+  }
+
+  preload() {
+    if (!this.cache.audio.exists("phrase-correct")) {
+      this.load.audio("phrase-correct", "../assets/sounds/minigame-4/phrase-correct.mp3");
+    }
+    if (!this.cache.audio.exists("loading-complete")) {
+      this.load.audio("loading-complete", "../assets/sounds/loading-complete.mp3");
+    }
   }
 
   create() {
@@ -425,6 +436,9 @@ export default class Minigame4 extends Phaser.Scene {
   this.acceptingInput = false;
 
   this.showStatus("PHRASE COMPLETED", "#46ff88");
+  SfxManager.start(this, "phrase-correct", {
+    volume: GameData.sfxVolume ?? 0.7,
+  });
 
   if (this.currentPuzzleIndex >= this.puzzles.length - 1) {
     this.progress = 100;
@@ -548,6 +562,9 @@ export default class Minigame4 extends Phaser.Scene {
     this.progress = 100;
     this.updateProgressUI();
     this.registry.set("task4Completed", true);
+    SfxManager.start(this, "loading-complete", {
+      volume: GameData.sfxVolume ?? 0.7,
+    });
 
     this.hideTerminalUI();
 

@@ -74,7 +74,10 @@ export default class MiniGame6 extends Phaser.Scene {
         }
     }
 
-    
+    private exitMinigame() {
+  this.scene.stop();
+  this.scene.resume("GamePlay");
+}
 
     create() {
 
@@ -195,6 +198,9 @@ export default class MiniGame6 extends Phaser.Scene {
 
                 this.resetCode();
             }
+             else if (key === 'Escape') {
+        this.exitMinigame();
+    }
 
         });
     }

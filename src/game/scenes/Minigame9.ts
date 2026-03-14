@@ -65,8 +65,16 @@ private dotH = 0;
     this.load.image("ENTER_PRESSED 1", "../assets/images/min8/ENTER_PRESSED 1.png");
   }
 
+  private exitMinigame() {
+  this.scene.stop();
+  this.scene.resume("GamePlay");
+}
+
   create() {
     const { width, height } = this.scale;
+    this.input.keyboard?.on("keydown-ESC", () => {
+  this.exitMinigame();
+});
     this.createExitButton();
 
     // ───────────────── B O M B A ─────────────────

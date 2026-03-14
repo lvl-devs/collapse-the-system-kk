@@ -94,9 +94,16 @@ private completedTargets: string[] = [];
     this.load.image("min7_terminal_bg", "../assets/images/tower_terminal.png");
   }
 
+  private exitMinigame() {
+  this.scene.stop();
+  this.scene.resume("GamePlay");
+}
   create() {
     const { width, height } = this.scale;
 
+    this.input.keyboard?.on("keydown-ESC", () => {
+  this.exitMinigame();
+});
     this.scale.off("resize");
     this.scale.on("resize", () => {
       this.scene.restart();

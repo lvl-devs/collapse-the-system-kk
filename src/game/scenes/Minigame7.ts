@@ -52,6 +52,7 @@ private completedTargets: string[] = [];
 
   private rowTexts: Phaser.GameObjects.Text[] = [];
 
+  
   constructor() {
     super("Minigame7");
   }
@@ -69,16 +70,18 @@ private completedTargets: string[] = [];
       this.scene.restart();
     });
 
-    this.computeLayout(width, height);
-    this.drawBackground();
-    this.createCloseButton();
-    this.createInterface();
+this.computeLayout(width, height);
+this.drawBackground();
+this.createCloseButton();
+this.createInterface();
 
-    this.input.keyboard?.on("keydown", this.handleKeyPress, this);
+this.input.keyboard?.on("keydown", this.handleKeyPress, this);
 
-    this.acceptingInput = true;
-    this.refreshUI();
-    this.showStatus("IDENTIFY THE CORRECT FLIGHT", "#8de8ff");
+this.acceptingInput = true;
+this.refreshUI();
+this.showStatus("IDENTIFY THE CORRECT FLIGHT", "#8de8ff");
+
+this.playIntroZoom();
   }
 
   private computeLayout(width: number, height: number) {
@@ -95,6 +98,34 @@ private completedTargets: string[] = [];
   this.screenH = height * 0.50;
 }
 
+private playIntroZoom() {
+  const cam = this.cameras.main;
+
+  // posizione iniziale
+  cam.setZoom(1.0);
+  cam.centerOn(this.scale.width / 2, this.scale.height / 2);
+
+  // delay prima dello zoom
+  this.time.delayedCall(1700, () => {
+
+    // movimento lento verso il monitor
+    cam.pan(
+      this.screenX - 10,
+      this.screenY + 40,
+      1800,
+      "Sine.easeOut"
+    );
+
+    // zoom contemporaneo
+    this.tweens.add({
+      targets: cam,
+      zoom: 1.6,
+      duration: 1900,
+      ease: "Sine.Out"
+    });
+
+  });
+}
   private drawBackground() {
     const { width, height } = this.scale;
 
@@ -112,7 +143,7 @@ private completedTargets: string[] = [];
       fontFamily: "Pixelify Sans",
       fontSize: `${Math.max(14, Math.round(18 * this.uiScale))}px`,
       color: "#ffffff",
-      fontStyle: "bold"
+      //fontStyle: "bold"
     })
     .setOrigin(0.5)
     .setInteractive({ useHandCursor: true });
@@ -142,47 +173,52 @@ private completedTargets: string[] = [];
   const topY = this.screenY - this.screenH * 0.50;
 
   this.titleText = this.add
-    .text(this.screenX, topY + 95, "FLIGHT CONTROL", {
+    .text(this.screenX, topY + 97, "FLIGHT CONTROL", {
       fontFamily: "Pixelify Sans",
-      fontSize: `${Math.max(18, Math.round(24 * this.uiScale))}px`,
+      fontSize: `${Math.max(18, Math.round(28 * this.uiScale))}px`,
       color: "#46ff88",
-      fontStyle: "bold"
+      fontStyle: "bold",
+      resolution: 2,
     })
     .setOrigin(0.5);
 
   this.clueText = this.add
-    .text(this.screenX, topY + 106 * this.uiScale, "", {
+    .text(this.screenX, topY + 108 * this.uiScale, "", {
       fontFamily: "Pixelify Sans",
-      fontSize: `${Math.max(8, Math.round(10 * this.uiScale))}px`,
+      fontSize: `${Math.max(8, Math.round(11 * this.uiScale))}px`,
       color: "#8de8ff",
       align: "center",
+      resolution: 2,
       wordWrap: { width: this.screenW * 0.72 }
     })
     .setOrigin(0.5);
 
   this.add
-    .text(leftX, topY + 86 * this.uiScale, "FLIGHTS", {
+    .text(leftX, topY + 96 * this.uiScale, "FLIGHTS", {
       fontFamily: "Pixelify Sans",
-      fontSize: `${Math.max(10, Math.round(13 * this.uiScale))}px`,
+      fontSize: `${Math.max(10, Math.round(20 * this.uiScale))}px`,
       color: "#d7fff0",
+      resolution: 2,
     })
     .setOrigin(0, 0.5);
 
   this.add
-    .text(rightX, topY + 86 * this.uiScale, "DETAILS", {
+    .text(rightX, topY + 96 * this.uiScale, "DETAILS", {
       fontFamily: "Pixelify Sans",
-      fontSize: `${Math.max(10, Math.round(13 * this.uiScale))}px`,
+      fontSize: `${Math.max(10, Math.round(20 * this.uiScale))}px`,
       color: "#d7fff0",
+      resolution: 2,
     })
     .setOrigin(0, 0.5);
 
   this.rowTexts = [];
   for (let i = 0; i < this.flights.length; i++) {
     const row = this.add
-      .text(leftX, topY + 120 * this.uiScale + i * 30 * this.uiScale, "", {
+      .text(leftX, topY + 130 * this.uiScale + i * 20 * this.uiScale, "", {
         fontFamily: "Pixelify Sans",
-        fontSize: `${Math.max(8, Math.round(10 * this.uiScale))}px`,
+        fontSize: `${Math.max(8, Math.round(12 * this.uiScale))}px`,
         color: "#9bd7c5",
+        resolution: 2,
       })
       .setOrigin(0, 0.5);
 
@@ -190,47 +226,53 @@ private completedTargets: string[] = [];
   }
 
   this.detailTitleText = this.add
-    .text(rightX, topY + 120 * this.uiScale, "", {
+    .text(rightX, topY + 129* this.uiScale, "", {
       fontFamily: "Pixelify Sans",
       fontSize: `${Math.max(12, Math.round(16 * this.uiScale))}px`,
       color: "#46ff88",
+      resolution: 2,
       fontStyle: "bold"
+      
     })
     .setOrigin(0, 0.5);
 
   this.detailInfoText = this.add
-    .text(rightX, topY + 150 * this.uiScale, "", {
+    .text(rightX, topY + 145 * this.uiScale, "", {
       fontFamily: "Pixelify Sans",
       fontSize: `${Math.max(8, Math.round(10 * this.uiScale))}px`,
       color: "#d7fff0",
+      resolution: 2,
       lineSpacing: 6 * this.uiScale
     })
     .setOrigin(0, 0);
 
   this.destinationText = this.add
-    .text(rightX, topY + 248 * this.uiScale, "", {
+    .text(rightX, topY + 232 * this.uiScale, "", {
       fontFamily: "Pixelify Sans",
       fontSize: `${Math.max(9, Math.round(11 * this.uiScale))}px`,
       color: "#ffe27a",
+      resolution: 2,
       wordWrap: { width: this.screenW * 0.25 }
     })
     .setOrigin(0, 0.5);
 
   this.footerText = this.add
-    .text(this.screenX, this.screenY + this.screenH * 0.40, "", {
+    .text(this.screenX - 280, this.screenY + this.screenH * 0.50, "", {
       fontFamily: "Pixelify Sans",
       fontSize: `${Math.max(8, Math.round(9 * this.uiScale))}px`,
       color: "#9db7c7",
+      resolution: 2,
       align: "center"
     })
-    .setOrigin(0.5);
+    .setOrigin(0, 0.5);
 
   this.statusText = this.add
     .text(this.screenX, this.screenY + this.screenH * 0.33, "", {
       fontFamily: "Pixelify Sans",
       fontSize: `${Math.max(10, Math.round(12 * this.uiScale))}px`,
       color: "#ffffff",
-      fontStyle: "bold"
+      resolution: 2,
+      //fontStyle: "bold"
     })
     .setOrigin(0.5)
     .setAlpha(0);
@@ -429,41 +471,45 @@ if (isSelected) {
   }
 
   private flashRowError(index: number) {
-    const row = this.rowTexts[index];
-    if (!row) return;
+  const row = this.rowTexts[index];
+  if (!row) return;
 
-    this.tweens.killTweensOf(row);
-    row.setColor("#ff6b8e");
+  const originalX = row.x;
 
-    this.tweens.add({
-      targets: row,
-      x: row.x + 7 * this.uiScale,
-      duration: 40,
-      yoyo: true,
-      repeat: 3,
-      onComplete: () => {
-        row.setX(this.screenX - this.screenW * 0.40);
-        this.refreshUI();
-      }
-    });
-  }
+  this.tweens.killTweensOf(row);
+  row.setColor("#ff6b8e");
+
+  this.tweens.add({
+    targets: row,
+    x: originalX + 7 * this.uiScale,
+    duration: 40,
+    yoyo: true,
+    repeat: 3,
+    onComplete: () => {
+      row.setX(originalX);
+      this.refreshUI();
+    }
+  });
+}
 
   private flashDestinationError() {
-    if (!this.destinationText) return;
+  if (!this.destinationText) return;
 
-    this.tweens.killTweensOf(this.destinationText);
+  const originalX = this.destinationText.x;
 
-    this.tweens.add({
-      targets: this.destinationText,
-      x: this.destinationText.x + 7 * this.uiScale,
-      duration: 40,
-      yoyo: true,
-      repeat: 3,
-      onComplete: () => {
-        this.destinationText?.setX(this.screenX + this.screenW * 0.15);
-      }
-    });
-  }
+  this.tweens.killTweensOf(this.destinationText);
+
+  this.tweens.add({
+    targets: this.destinationText,
+    x: originalX + 7 * this.uiScale,
+    duration: 40,
+    yoyo: true,
+    repeat: 3,
+    onComplete: () => {
+      this.destinationText?.setX(originalX);
+    }
+  });
+}
 
   private showStatus(message: string, color: string) {
     if (!this.statusText) return;
@@ -518,7 +564,7 @@ if (isSelected) {
         fontFamily: "Pixelify Sans",
         fontSize: `${Math.max(24, Math.round(34 * this.uiScale))}px`,
         color: "#46ff88",
-        fontStyle: "bold"
+       // fontStyle: "bold"
       })
       .setOrigin(0.5);
 
@@ -527,7 +573,7 @@ if (isSelected) {
     fontFamily: "Pixelify Sans",
     fontSize: `${Math.max(14, Math.round(18 * this.uiScale))}px`,
     color: "#8de8ff",
-    fontStyle: "bold"
+    //fontStyle: "bold"
   })
   .setOrigin(0.5);
 

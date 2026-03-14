@@ -1,5 +1,4 @@
-import type { DungeonThemeKey, DungeonConfig } from "./game/systems/DungeonGenerator";
-export type { DungeonThemeKey, DungeonConfig };
+
 
 export interface Settings {
   graphics: number;
@@ -27,12 +26,6 @@ export interface Menu {
   fontSize: number;
 }
 
-export interface DungeonSettings {
-  defaultTheme: DungeonThemeKey;
-  availableThemes: DungeonThemeKey[];
-  defaultConfig: Omit<DungeonConfig, "theme" | "seed">;
-}
-
 export interface PreloaderConfig {
   loadingTextFont: string;
   loadingTextColor: string;
@@ -45,7 +38,6 @@ export interface GameDataType {
   menu: Menu;
   preloader: PreloaderConfig;
   settings: Settings;
-  dungeon: DungeonSettings;
   sfxVolume?: number;
   musicVolume?: number;
   images: { name: string; path: string }[];
@@ -60,13 +52,15 @@ export interface GameDataType {
   bitmapfonts: any[];
 }
 
+
+
 export const GameData: GameDataType = {
 
   globals: {
     gameWidth: 1280,
     gameHeight: 800,
     gameTitle: "Collapse The System",
-    bgColor: "#0a0a0f",
+    bgColor: "#111518",
     debug: false,
     defaultFont: {
       key: "Pixelify Sans",
@@ -97,68 +91,6 @@ export const GameData: GameDataType = {
     audio: 0.7,
     invertY: false,
     vibration: true
-  },
-
-  dungeon: {
-    defaultTheme: "cyber",
-    availableThemes: ["cyber", "cave", "facility", "void"],
-    defaultConfig: {
-      width: 50,
-      height: 50,
-      tileSize: 32,
-      doorPadding: 2,
-      rooms: {
-        width: { min: 7, max: 15, onlyOdd: true },
-        height: { min: 7, max: 15, onlyOdd: true },
-        maxRooms: 12,
-        maxArea: 150,
-      },
-      placement: {
-        stairs: {
-          roomRole: "end",
-        },
-        objects: [
-          {
-            id: "chairs",
-            tileIndex: 52,
-            tileVariants: [
-              {
-                base: 52,
-                byWall: {
-                  top: 52,
-                  left: 73,
-                  right: 94,
-                  bottom: 115
-                },
-              },
-              {
-                base: 53,
-                byWall: {
-                  top: 53,
-                  left: 74,
-                  right: 95,
-                  bottom: 116 
-                },
-              },
-            ],
-            roomRoles: ["other"],
-            chancePerRoom: 0.7,
-            countPerRoom: {
-              min: 3,
-              max: 5,
-            },
-            position: {
-              mode: "wallAttached",
-              wallSides: ["top", "left", "right"],
-              avoidCenter: true,
-              paddingFromWalls: 1,
-            },
-            avoidOccupiedRooms: false,
-            avoidOccupiedTiles: true,
-          },
-        ],
-      },
-    },
   },
 
   sfxVolume: 0.7,
@@ -192,14 +124,38 @@ export const GameData: GameDataType = {
     { name: "button_c_pressed", path: "/images/c_pressed.png" },
     { name: "button_ok", path: "/images/ok.png" },
     { name: "button_ok_pressed", path: "/images/ok_pressed.png" },
+    { name: "airport", path: "/tilemaps/airport.png" },
+    { name: "home", path: "/tilemaps/home.png" },
     { name: "tileset-cyber", path: "/tilemaps/home.png" },
     { name: "tileset-cave", path: "/tilemaps/home.png" },
     { name: "tileset-facility", path: "/tilemaps/home.png" },
     { name: "tileset-void", path: "/tilemaps/home.png" },
 
+    { name: "airport-desk", path: "/tilemaps/other-objects/airport-desk.png" },
+    { name: "airport-fire-extinguisher", path: "/tilemaps/other-objects/airport-fire-extinguisher.png" },
+    { name: "baggage-1", path: "/tilemaps/other-objects/baggage-1.png" },
+    { name: "baggage-2", path: "/tilemaps/other-objects/baggage-2.png" },
+    { name: "baggage-3", path: "/tilemaps/other-objects/baggage-3.png" },
+    { name: "baggage-conveyor", path: "/tilemaps/other-objects/baggage-conveyor.png" },
+    { name: "server-rack-closed", path: "/tilemaps/other-objects/server-rack-closed.png" },
+    { name: "server-rack-open", path: "/tilemaps/other-objects/server-rack-open.png" },
+    { name: "fire-extinguisher", path: "/tilemaps/other-objects/fire-extinguisher.png" },
+    { name: "door-closed", path: "/tilemaps/doors/front/door-closed.png" },
+    { name: "door-open", path: "/tilemaps/doors/front/door-open.png" },
+    { name: "door", path: "/tilemaps/doors/front/door.png" },
+    { name: "left-side-doors-closed", path: "/tilemaps/doors/side/left-side-doors-closed.png" },
+    { name: "left-side-doors-open", path: "/tilemaps/doors/side/left-side-doors-open.png" },
+    { name: "right-side-doors-closed", path: "/tilemaps/doors/side/right-side-doors-closed.png" },
+    { name: "right-side-doors-open", path: "/tilemaps/doors/side/right-side-doors-open.png" },
+    { name: "left-side-door-closed", path: "/tilemaps/doors/side/left-side-doors-closed.png" },
+    { name: "left-side-door-open", path: "/tilemaps/doors/side/left-side-doors-open.png" },
+    { name: "right-side-door-closed", path: "/tilemaps/doors/side/right-side-doors-closed.png" },
+    { name: "right-side-door-open", path: "/tilemaps/doors/side/right-side-doors-open.png" },
   ],
 
-  tilemaps: [],
+  tilemaps: [
+    { key: "static-map", path: "/tilemaps/map-agency.json" }
+  ],
   atlas: [],
   spritesheets: [
     { name: "hacker", path: "/spritesheets/hacker.png", width: 32, height: 45, frames: 12 },
@@ -208,7 +164,9 @@ export const GameData: GameDataType = {
   ],
   sounds: [
     { name: "menu-theme", paths: ["/music/menu.mp3"] },
-    { name: "rain-sfx", paths: ["/sounds/rain.mp3"] }
+    { name: "level-1-theme", paths: ["/music/level-1.mp3"] },
+    { name: "rain-sfx", paths: ["/sounds/rain.mp3"] },
+    { name: "step-sfx", paths: ["/sounds/step.mp3"] }
   ],
   videos: [
     { name: 'bg-menu', path: '/videos/bg-menu.mp4' }

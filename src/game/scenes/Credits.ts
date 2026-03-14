@@ -34,12 +34,12 @@ export default class Credits extends Phaser.Scene {
 
     MusicManager.start(this, Credits.MENU_MUSIC_KEY, {
       loop: true,
-      volume: GameData.musicVolume ?? 0.6,
+      volume: MusicManager.toEngineVolume(GameData.musicVolume ?? 0.6),
     });
 
     SfxManager.start(this, Credits.RAIN_SFX_KEY, {
       loop: true,
-      volume: GameData.sfxVolume ?? 0.35,
+      volume: GameData.sfxVolume ?? 0.7,
     });
 
     // ===== BACKGROUND =====
@@ -74,8 +74,9 @@ export default class Credits extends Phaser.Scene {
     this.title.setShadow(2, 2, "#000000", 0);
 
     // ===== CREDITS TEXT =====
-    const leftCredits = ["GAME DESIGN", "Your Name", "", "PROGRAMMING", "Your Name"];
-    const rightCredits = ["ART", "Your Name", "", "MUSIC & SOUND", "Your Name"];
+    const leftCredits = ["GAME DESIGN", "pH@ntom, conan","", "PROGRAMMING", "mokkek, pH@ntom,", "conan, ndreW, pako"];
+
+    const rightCredits = ["ART", "thatslory", "", "MUSIC & SOUND", "thatslory, pako"];
 
     this.leftText = this.add
       .text(0, 0, leftCredits, {

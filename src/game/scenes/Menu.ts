@@ -3,6 +3,7 @@ import GameData from "../../GameData";
 import AssetPipeline from "../systems/AssetPipeline";
 import MusicManager from "../audio/MusicManager";
 import SfxManager from "../audio/SfxManager";
+import LevelStorage from "../systems/LevelStorage";
 import SettingsStorage from "../systems/SettingsStorage";
 
 export default class Menu extends Phaser.Scene {
@@ -134,9 +135,37 @@ export default class Menu extends Phaser.Scene {
     const item = GameData.menu.items[index];
     console.log("[Menu] selectItem - starting scene:", item.scene);
     if (item.scene === "GamePlay") {
+      LevelStorage.resetToFirstLevel();
       MusicManager.stop(this, Menu.MENU_MUSIC_KEY);
       SfxManager.stop(this, Menu.RAIN_SFX_KEY);
       this.scene.stop("MenuBackdrop");
+
+      const startGameplay = () => {
+        this.scene.start(item.scene);
+      };
+
+      if (AssetPipeline.isDeferredReady()) {
+        startGameplay();
+        return;
+      }
+
+      const loadingLabel = this.add
+        .text(this.scale.width * 0.05, this.scale.height * 0.82, "LOADING MISSION DATA...", {
+          color: "#70fdc2",
+        })
+        .setFontSize(24)
+        .setFontFamily(GameData.preloader.loadingTextFont)
+        .setShadow(2, 2, "#001E17", 0, false, true);
+
+      if (!AssetPipeline.isDeferredLoading()) {
+        AssetPipeline.startDeferredPreload(this);
+      }
+
+      this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+        loadingLabel.destroy();
+        startGameplay();
+      });
+      return;
     }
     this.scene.start(item.scene);
   }

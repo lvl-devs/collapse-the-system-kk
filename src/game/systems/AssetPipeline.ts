@@ -5,23 +5,34 @@ type Phase = "critical" | "deferred";
 
 const CRITICAL_IMAGE_KEYS = new Set(["bg_logo", "title_img"]);
 const CRITICAL_VIDEO_KEYS = new Set(["bg-menu"]);
-const CRITICAL_SOUND_KEYS = new Set(["menu-theme", "rain-sfx"]);
+const CRITICAL_SOUND_KEYS = new Set(["menu-theme", "level-1-theme", "rain-sfx"]);
 
 export default class AssetPipeline {
-  private static deferredStarted = false;
+  private static deferredReady = false;
+  private static deferredLoading = false;
 
   static preloadCritical(scene: Phaser.Scene): void {
     this.loadAssets(scene, "critical");
   }
 
   static startDeferredPreload(scene: Phaser.Scene): void {
-    if (this.deferredStarted) {
-      return;
-    }
+    if (this.deferredReady || this.deferredLoading) return;
 
-    this.deferredStarted = true;
+    this.deferredLoading = true;
     this.loadAssets(scene, "deferred");
+    scene.load.once(Phaser.Loader.Events.COMPLETE, () => {
+      this.deferredReady = true;
+      this.deferredLoading = false;
+    });
     scene.load.start();
+  }
+
+  static isDeferredReady(): boolean {
+    return this.deferredReady;
+  }
+
+  static isDeferredLoading(): boolean {
+    return this.deferredLoading;
   }
 
   private static loadAssets(scene: Phaser.Scene, phase: Phase): void {

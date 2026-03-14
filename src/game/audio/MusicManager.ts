@@ -53,6 +53,45 @@ export default class MusicManager {
     this.clearUnlock(scene, key);
   }
 
+  static pause(scene: Phaser.Scene, key: string): void {
+    const sound = scene.sound.get(key);
+    if (!sound) {
+      return;
+    }
+    if ((sound as any).isPlaying) {
+      sound.pause();
+    }
+  }
+
+  static resume(
+    scene: Phaser.Scene,
+    key: string,
+    config: Phaser.Types.Sound.SoundConfig = {}
+  ): Phaser.Sound.BaseSound | undefined {
+    const sound = scene.sound.get(key);
+    if (!sound) {
+      return this.start(scene, key, config);
+    }
+
+    if (config.volume != null) {
+      (sound as any).volume = config.volume;
+    }
+    if (config.loop != null) {
+      (sound as any).loop = config.loop;
+    }
+
+    if ((sound as any).isPaused) {
+      (sound as any).resume();
+      return sound;
+    }
+
+    if (!(sound as any).isPlaying) {
+      return this.start(scene, key, config);
+    }
+
+    return sound;
+  }
+
   static startForScene(
     scene: Phaser.Scene,
     key: string,

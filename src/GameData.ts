@@ -98,7 +98,6 @@ export const GameData: GameDataType = {
 
   images: [
     { name: "bg_logo", path: "/images/bg_logo.png" },
-    { name: "title_img", path: "/images/title.png" },
     { name: "tileset-cyber", path: "/tilemaps/home.png" },
     { name: "tileset-cave", path: "/tilemaps/home.png" },
     { name: "tileset-facility", path: "/tilemaps/home.png" },
@@ -116,7 +115,7 @@ export const GameData: GameDataType = {
   ],
 
   tilemaps: [
-    { key: "static-map", path: "/tilemaps/map.json" }
+    { key: "static-map", path: "/tilemaps/map-agency.json" }
   ],
   atlas: [],
   spritesheets: [

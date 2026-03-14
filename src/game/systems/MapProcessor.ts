@@ -10,12 +10,29 @@ export interface MapMetadata {
     tilesets: Phaser.Tilemaps.Tileset[];
     layers: Phaser.Tilemaps.TilemapLayer[];
     map: Phaser.Tilemaps.Tilemap;
+    rawObjectLayers: any[];
 }
 
 export default class MapProcessor {
     static readonly COLLISION_PROP = "collision";
     static readonly IS_FLOOR_PROP = "isFloor";
     static readonly SPAWN_TYPE = "SpawnPoint";
+
+    /**
+     * Recursively extracts objectgroups from Tiled JSON data, traversing group layers.
+     */
+    static extractObjectLayers(rawLayers: any[]): any[] {
+        let objectLayers: any[] = [];
+        if (!rawLayers) return objectLayers;
+        for (const layer of rawLayers) {
+            if (layer.type === "objectgroup") {
+                objectLayers.push(layer);
+            } else if (layer.type === "group" && layer.layers) {
+                objectLayers = objectLayers.concat(this.extractObjectLayers(layer.layers));
+            }
+        }
+        return objectLayers;
+    }
 
     /**
      * Processes a tilemap dynamically, determining layers, collisions, and spawn points based on properties and naming conventions.
@@ -40,6 +57,16 @@ export default class MapProcessor {
                 }
             }
         });
+
+        // Parse raw map data to extract nested object groups
+        let rawObjectLayers: any[] = [];
+        const rawMapData = scene.cache.tilemap.get(mapKey)?.data;
+        if (rawMapData && rawMapData.layers) {
+            rawObjectLayers = this.extractObjectLayers(rawMapData.layers);
+        } else {
+            // Fallback to Phaser's parsed objects if raw data is unavailable
+            rawObjectLayers = map.objects || [];
+        }
 
         const activeLayers: Phaser.Tilemaps.TilemapLayer[] = [];
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -68,6 +95,19 @@ export default class MapProcessor {
                 // If it's a collision layer, we might still want to exclude some specific GIDs if they are floor
                 // But generally, the user wants versatility, so we rely on Tiled setup.
                 layer.setCollisionByExclusion([-1]);
+            }
+
+            // Assign depth based on layer name semantics to ensure proper rendering order
+            if (isFloorName) {
+                layer.setDepth(0);
+            } else if (lowerName.includes("top-wall")) {
+                layer.setDepth(15);
+            } else if (lowerName.includes("doors")) {
+                layer.setDepth(5);
+            } else if (isWallName) {
+                layer.setDepth(1);
+            } else {
+                layer.setDepth(2);
             }
 
             activeLayers.push(layer);
@@ -120,7 +160,7 @@ export default class MapProcessor {
             });
         }
 
-        return { minX, minY, maxX, maxY, spawnX, spawnY, tilesets, layers: activeLayers, map };
+        return { minX, minY, maxX, maxY, spawnX, spawnY, tilesets, layers: activeLayers, map, rawObjectLayers };
     }
 
     static getProperty(data: any, name: string): any {

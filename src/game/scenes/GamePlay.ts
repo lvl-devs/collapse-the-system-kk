@@ -88,7 +88,7 @@ export default class GamePlay extends Phaser.Scene {
     };
 
     const mapData = MapProcessor.processMap(this, "static-map", TS_MAP);
-    const { map, layers, spawnX, spawnY, minX, minY, maxX, maxY } = mapData;
+    const { map, layers, rawObjectLayers, spawnX, spawnY, minX, minY, maxX, maxY } = mapData;
 
     console.log(`[Spawn Debug] Bounds: [${minX}, ${minY}] to [${maxX}, ${maxY}]`);
     console.log(`[Spawn Debug] Spawn finale: (${spawnX}, ${spawnY})`);
@@ -126,47 +126,89 @@ export default class GamePlay extends Phaser.Scene {
     });
 
     // --- RENDERING OGGETTI E COLLISIONI ---
-    map.objects.forEach(layer => {
-      layer.objects.forEach(obj => {
+    rawObjectLayers.forEach(layer => {
+      // console.log(`[Object Layer] Processing layer: ${layer.name}`);
+      layer.objects.forEach((obj: any) => {
         // Logica versatile per gli oggetti:
         // Se ha un GID (è un tile object), proviamo a renderizzarlo
         if (obj.gid) {
+            const gid = obj.gid & 0x1FFFFFFF; // Clear Tiled flip bits
+            const flipX = (obj.gid & 0x80000000) !== 0;
+            const flipY = (obj.gid & 0x40000000) !== 0;
+
             // Cerchiamo il nome della texture associata al tileset del GID
-            const tileset = map.tilesets.find(t => obj.gid! >= t.firstgid && obj.gid! < t.firstgid + (t as any).tileCount);
+            const sortedTilesets = [...map.tilesets].sort((a,b) => b.firstgid - a.firstgid);
+            const tileset = sortedTilesets.find(t => t.firstgid <= gid);
             if (tileset) {
                 // Per i "collection of images" tilesets, dobbiamo trovare la texture specifica
                 let textureKey = TS_MAP[tileset.name] || tileset.name;
-          let frame: string | undefined;
+                let frame: string | undefined;
                 
-                // Se il tileset ha una definizione per ogni tile (come 'objects' o 'doors')
-                const tileData = (tileset as any).tileData;
-                const localId = obj.gid! - tileset.firstgid;
-                if (tileData && tileData[localId] && tileData[localId].image) {
-                    const imageName = tileData[localId].image;
+                const localId = gid - tileset.firstgid;
+
+                let imageName: string | undefined;
+                
+                // Fetch raw tileset data directly from the Tiled JSON cache to bypass Phaser parsing flaws
+                const rawMapData = this.cache.tilemap.get("static-map")?.data;
+                const rawTileset = rawMapData?.tilesets?.find((rt: any) => rt.name === tileset.name);
+                
+                if (rawTileset && Array.isArray(rawTileset.tiles)) {
+                    const tileObj = rawTileset.tiles.find((t: any) => t.id === localId);
+                    if (tileObj && tileObj.image) {
+                        imageName = tileObj.image;
+                    }
+                }
+                // Fallback to Phaser parsing if raw mapping lacks it
+                if (!imageName) {
+                    const tileData = (tileset as any).tileData;
+                    if (tileData && tileData[localId] && tileData[localId].image) {
+                        imageName = tileData[localId].image;
+                    } else if ((tileset as any).customData && (tileset as any).customData[localId] && ((tileset as any).customData[localId] as any).image) {
+                        imageName = ((tileset as any).customData[localId] as any).image;
+                    }
+                }
+
+                if (imageName) {
                     // Estraiamo il nome del file senza estensione e cartella come fallback per la chiave
-                    const parts = imageName.split('/');
+                    const parts = imageName.split(/[/\\]/);
                     textureKey = parts[parts.length - 1].split('.')[0];
-                  } else {
+                    // console.log(`[Mapping Debug] imageName: ${imageName} -> textureKey: ${textureKey}`);
+                } else {
                     frame = this.getOrCreateTilesetFrame(textureKey, tileset, localId);
                 }
 
                 if (this.textures.exists(textureKey)) {
                     const sprite = this.add.sprite(obj.x!, obj.y!, textureKey, frame);
                     sprite.setOrigin(0, 1);
+                    sprite.setFlip(flipX, flipY);
                     
+                    // console.log(`[Object Spawned] ${textureKey} at (${obj.x}, ${obj.y})`);
+
                     // Gestione depth e collisioni dinamiche
                     const depth = MapProcessor.getProperty(obj, "depth") || 5;
                     sprite.setDepth(depth);
                     const hasCollision = MapProcessor.getProperty(obj, "collision") !== false;
                     if (hasCollision) {
-                        this.physics.add.existing(sprite, true);
+                        this.physics.add.existing(sprite, false);
+                        if (sprite.body) {
+                          const body = sprite.body as Phaser.Physics.Arcade.Body;
+                          body.setSize(sprite.width, sprite.height / 2);
+                          body.setOffset(0, sprite.height / 2);
+                          body.setImmovable(true);
+                          body.setAllowGravity(false);
+                          body.moves = false;
+                        }
                         this.physics.add.collider(this.playerController.sprite, sprite);
                     }
+                } else {
+                    console.warn(`[Object Warning] Missing texture: ${textureKey} for GID ${gid}`);
                 }
+            } else {
+                console.warn(`[Object Warning] No tileset found for GID ${gid}`);
             }
         }
+      });
     });
-});
 
     // Collisioni su tutti i layer base processati
     layers.forEach(l => this.physics.add.collider(this.playerController.sprite, l));

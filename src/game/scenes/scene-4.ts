@@ -121,10 +121,7 @@ export default class Scene4 extends Phaser.Scene {
             duration:1000
         });
 
-        // dopo 4 secondi avvia il gioco
-        this.time.delayedCall(4000, ()=>{
-            this.scene.start("GamePlay");
-        });
+        // Rimane nella scena finale dopo la vittoria.
 
     }
 

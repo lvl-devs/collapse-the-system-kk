@@ -77,12 +77,30 @@ export default class Minigame1 extends Phaser.Scene {
   private draggingPointerId?: number;
 
   private readonly externalBoxKey = "minigame1-external-box";
+  private readonly accessGrantedKey = "minigame1-access-granted";
+  private readonly bgKey = "minigame1-bg";
 
   preload() {
   this.load.image(
     this.externalBoxKey,
     "../assets/images/minigame1/minigame1-external-box.png"
   );
+
+  this.load.image(
+    this.externalBoxKey,
+    "../assets/images/min3/minigame1-external-box.png"
+  );
+
+  this.load.image(
+    this.accessGrantedKey,
+    "../assets/images/min3/Access_granted.png"
+  );
+
+  this.load.image(
+    this.bgKey,
+    "../assets/images/minigame1/bg-min1.png"
+  );
+
 }
 
   constructor() {
@@ -92,33 +110,44 @@ export default class Minigame1 extends Phaser.Scene {
   // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
   create() {
-    const { width, height } = this.scale;
+const { width, height } = this.scale;
 
-    this.scale.off("resize");
-    this.scale.on("resize", () => this.scene.restart());
+  this.scale.off("resize");
+  this.scale.on("resize", () => this.scene.restart());
 
-    this.wires = [];
-    this.sockets = [];
+  this.wires = [];
+  this.sockets = [];
 
-    //this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.82);
-    this.computeResponsiveLayout(width, height);
-    this.drawTablet();
-    this.createCloseButton();
-    this.createHeaderTexts();
-    this.createAlerts();
-    this.createSocketsAndWires();
+  this.computeResponsiveLayout(width, height);
+  this.drawBackground();
+  this.drawTablet();
+  this.createCloseButton();
+  this.createHeaderTexts();
+  this.createAlerts();
+  this.createSocketsAndWires();
 
-    this.input.on("pointermove", this.onPointerMove, this);
-    this.input.on("pointerup", this.onPointerUp, this);
-    this.input.on("pointerupoutside", this.onPointerUp, this);
+  this.input.on("pointermove", this.onPointerMove, this);
+  this.input.on("pointerup", this.onPointerUp, this);
+  this.input.on("pointerupoutside", this.onPointerUp, this);
 
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.input.off("pointermove", this.onPointerMove, this);
-      this.input.off("pointerup", this.onPointerUp, this);
-      this.input.off("pointerupoutside", this.onPointerUp, this);
-    });
+  this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+    this.input.off("pointermove", this.onPointerMove, this);
+    this.input.off("pointerup", this.onPointerUp, this);
+    this.input.off("pointerupoutside", this.onPointerUp, this);
+  });
+    
   }
 
+private drawBackground() {
+  const { width, height } = this.scale;
+
+  const bg = this.add
+    .image(width / 2, height / 2, this.bgKey)
+    .setDepth(-100);
+
+  const scale = Math.max(width / bg.width, height / bg.height);
+  bg.setScale(scale);
+}
   // ─── Layout ─────────────────────────────────────────────────────────────────
 
   private computeResponsiveLayout(width: number, height: number) {
@@ -150,85 +179,74 @@ export default class Minigame1 extends Phaser.Scene {
   }
 
   private createHeaderTexts() {
-    const titleSize = Math.round(this.s(34));
+  const titleSize = Math.round(this.s(34));
 
-    this.add
-      .text(
-        this.boardX,
-        this.boardY - this.boardH / 2 - this.s(-80),
-        "CROSS-WIRE BREACH",
-        {
-          fontFamily: "Pixelify Sans",
-          fontSize: `${titleSize}px`,
-          color: "#ffffff",
-          fontStyle: "bold",
-/*           stroke: "#0e2f12",
-          strokeThickness: Math.max(3, Math.round(this.s(5))),
- */        }
-      )
-      .setOrigin(0.5)
-      .setDepth(200);
-
-    const hintY = this.screenY - this.screenH / 2 + this.screenH * 0.095;
-    const hintBg = this.add
-      .rectangle(
-        this.screenX,
-        hintY,
-        this.screenW * 0.64,
-        Math.max(34, this.s(38)),
-        0x10202a,
-        0.88
-      )
-      .setOrigin(0.5)
-      .setStrokeStyle(2, 0x39f4ff, 0.35)
-      .setAlpha(0);
-
-    const hintText = this.add
-      .text(
-        this.screenX,
-        hintY,
-        "RESTORE THE CIRCUIT BY MATCHING COLORS",
-        {
-          fontFamily: "Pixelify Sans",
-          fontSize: `${Math.max(22, Math.round(this.s(16)))}px`,
-          color: "#bafcff",
-          align: "center",
-        }
-      )
-      .setOrigin(0.5)
-      .setAlpha(1);
-
-    const targets = [hintBg, hintText];
-    this.tweens.add({ targets, alpha: 1, duration: 1250, ease: "Sine.Out" });
-    this.tweens.add({ targets, alpha: 0, duration: 1500, delay: 1900, ease: "Sine.In" });
-  }
-
-  private createAlerts() {
-    const alertY = this.screenY - this.screenH / 2 + this.screenH * 0.055;
-
-    this.alertBg = this.add
-      .rectangle(
-        this.screenX,
-        alertY,
-        this.screenW * 0.30,
-        Math.max(24, this.s(30)),
-        0xff2f3d,
-        0.92
-      )
-      .setOrigin(0.5)
-      .setStrokeStyle(2, 0xffffff, 0.18)
-      .setAlpha(0);
-
-    this.alertText = this.add
-      .text(this.screenX, alertY, "", {
+  this.add
+    .text(
+      this.boardX,
+      this.boardY - this.boardH / 2 - this.s(-80),
+      "CROSS-WIRE BREACH",
+      {
         fontFamily: "Pixelify Sans",
-        fontSize: `${Math.max(12, Math.round(this.s(16)))}px`,
+        fontSize: `${titleSize}px`,
         color: "#ffffff",
         fontStyle: "bold",
-      })
-      .setOrigin(0.5)
-      .setAlpha(0);
-  }
+      }
+    )
+    .setOrigin(0.5)
+    .setDepth(200);
+
+  const hintY = this.screenY - this.screenH / 2 + this.screenH * 0.095;
+
+  const hintText = this.add
+    .text(
+      this.screenX,
+      hintY,
+      "RESTORE THE CIRCUIT BY MATCHING COLORS",
+      {
+        fontFamily: "Pixelify Sans",
+        fontSize: `${Math.max(22, Math.round(this.s(33)))}px`,
+        color: "#bafcff",
+        align: "center",
+        fontStyle: "bold",
+      }
+    )
+    .setOrigin(0.5)
+    .setAlpha(0);
+
+  this.tweens.add({
+    targets: hintText,
+    alpha: 1,
+    duration: 1250,
+    ease: "Sine.Out"
+  });
+
+  this.tweens.add({
+    targets: hintText,
+    alpha: 0,
+    duration: 1500,
+    delay: 1900,
+    ease: "Sine.In"
+  });
+}
+
+  private createAlerts() {
+  const alertY = this.screenY;
+
+  this.alertText = this.add
+    .text(this.screenX, alertY, "", {
+      fontFamily: "Pixelify Sans",
+      fontSize: `${Math.max(26, Math.round(this.s(27)))}px`,
+      color: "#ff2f3d",
+      fontStyle: "bold",
+      align: "center",
+      stroke: "#000000",
+      strokeThickness: Math.max(2, Math.round(this.s(5))),
+    })
+    .setOrigin(0.5)
+    .setDepth(900)
+    .setAlpha(0);
+}
 
   private createCloseButton() {
   const closeX = this.boardX + this.boardW / 2 - this.s(42);
@@ -872,46 +890,111 @@ export default class Minigame1 extends Phaser.Scene {
   }
 
   private checkWin() {
-    if (!this.wires.every(w => w.connected)) return;
+  if (!this.wires.every(w => w.connected)) return;
 
-    const winY = this.screenY + this.screenH / 2 - this.screenH * 0.05;
-    const winBg = this.add
-      .rectangle(
-        this.screenX, winY,
-        this.screenW * 0.42,
-        Math.max(30, this.s(36)),
-        0x1a3a31, 0.88
-      )
-      .setStrokeStyle(2, 0x70fdc2, 0.45)
-      .setOrigin(0.5);
+  this.registry.set("task1Completed", true);
 
-    const winText = this.add
-      .text(this.screenX, winY, "COMPLETED: ACCESS UNLOCKED", {
-        fontFamily: "Pixelify Sans",
-        fontSize: `${Math.max(18, Math.round(this.s(22)))}px`,
-        color: "#70fdc2",
-        fontStyle: "bold",
-      })
-      .setOrigin(0.5);
+  // blocca input
+  this.input.enabled = false;
+  this.draggingWire = undefined;
+  this.draggingPointerId = undefined;
 
-    this.registry.set("task1Completed", true);
-    this.tweens.add({ targets: [winBg, winText], alpha: 0.72, duration: 260, yoyo: true, repeat: 2 });
-    this.time.delayedCall(1200, () => { this.scene.stop(); this.scene.resume("GamePlay"); });
-  }
+  // schermo nero SOLO nella parte interna del monitor
+  const blackScreen = this.add.graphics();
+blackScreen.fillStyle(0x000000, 1);
+
+const w = this.screenW + this.s(12);
+const h = this.screenH + this.s(16);
+const r = this.s(6); // angoli leggermente arrotondati
+
+blackScreen.fillRoundedRect(
+  this.screenX + this.s(0.2) - w / 2,
+  this.screenY + this.s(3.9) - h / 2,
+  w,
+  h,
+  r
+);
+
+blackScreen.setDepth(1000);
+blackScreen.setAlpha(0);
+
+  // immagine ACCESS GRANTED centrata nello schermo del monitor
+  const accessImage = this.add
+    .image(this.screenX, this.screenY, this.accessGrantedKey)
+    .setOrigin(0.5)
+    .setDepth(1001)
+    .setAlpha(0);
+
+  // scala immagine per farla stare bene dentro lo schermo
+  const maxW = this.screenW * 0.72;
+  const maxH = this.screenH * 0.28;
+  const scale = Math.min(
+    maxW / accessImage.width,
+    maxH / accessImage.height
+  );
+
+  accessImage.setScale(scale * 0.92);
+
+  this.tweens.add({
+    targets: blackScreen,
+    alpha: 1,
+    duration: 220,
+    ease: "Power2.Out"
+  });
+
+  this.tweens.add({
+    targets: accessImage,
+    alpha: 1,
+    duration: 260,
+    delay: 120,
+    ease: "Power2.Out"
+  });
+
+  this.tweens.add({
+    targets: accessImage,
+    scaleX: scale,
+    scaleY: scale,
+    duration: 240,
+    delay: 120,
+    ease: "Back.Out"
+  });
+
+  this.time.delayedCall(2000, () => {
+    this.scene.stop();
+    this.scene.resume("GamePlay");
+  });
+}
 
   // ─── Alert ──────────────────────────────────────────────────────────────────
 
-  private showAlert(message: string, hold = 500) {
-    if (!this.alertText || !this.alertBg) return;
-    this.tweens.killTweensOf([this.alertText, this.alertBg]);
-    this.alertText.setText(message);
-    this.alertBg.width = this.screenW * 0.30;
-    this.alertBg.setAlpha(0.92);
-    this.alertText.setAlpha(1);
-    this.cameras.main.shake(180, 0.006);
-    this.tweens.add({ targets: [this.alertText, this.alertBg], alpha: 0, duration: 550, delay: hold });
-  }
+  private showAlert(message: string, hold = 350) {
+  if (!this.alertText) return;
 
+  this.tweens.killTweensOf(this.alertText);
+
+  this.alertText.setText(message);
+  this.alertText.setScale(0.92);
+  this.alertText.setAlpha(0);
+
+  this.tweens.add({
+    targets: this.alertText,
+    alpha: 1,
+    scaleX: 1,
+    scaleY: 1,
+    duration: 140,
+    ease: "Power2.Out",
+    yoyo: false,
+    onComplete: () => {
+      this.tweens.add({
+        targets: this.alertText,
+        alpha: 0,
+        duration: 320,
+        delay: hold,
+        ease: "Sine.In"
+      });
+    }
+  });
+}
   // ─── Tablet drawing ─────────────────────────────────────────────────────────
 
   private drawTablet() {

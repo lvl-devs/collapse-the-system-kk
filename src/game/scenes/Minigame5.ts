@@ -32,7 +32,7 @@ export default class Minigame5 extends Phaser.Scene {
   private readonly xrayCropHeight = 682;
   private readonly xrayOffsetX = 150;
   private readonly xrayOffsetY = -40;
-  private readonly xrayExitOffsetX = 250;
+  private readonly xrayExitOffsetX = 200;
   private readonly conveyorTileOffsetY = 262;
   private readonly conveyorScaleY = 10;
   private readonly conveyorVisualOffsetY = -35;

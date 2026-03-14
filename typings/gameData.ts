@@ -46,3 +46,74 @@ interface FontAsset {
   imgpath?: string;
   xmlpath?: string;
 }
+
+// ─── Dungeon Generation ────────────────────────────────────────────────
+
+/** Chiave che identifica un tema visivo dungeon */
+type DungeonThemeKey = "cyber" | "cave" | "facility" | "void";
+
+/** Indici tile all'interno di un tileset per un tema dungeon */
+interface DungeonTileIndices {
+  empty: number;
+  floor: number;
+  wall: number;
+  wallTop: number;
+  door: number;
+  void: number;
+}
+
+/** Metadati visivi e tile-index di un tema dungeon */
+interface DungeonThemeAsset {
+  key: DungeonThemeKey;
+  label: string;
+  tilesetKey: string;
+  tilesetPath: string;
+  bgColor: string;
+  tiles: DungeonTileIndices;
+}
+
+/** Configurazione di una singola stanza nella generazione */
+interface DungeonRoomConfig {
+  maxRooms: number;
+  minWidth: number;
+  maxWidth: number;
+  minHeight: number;
+  maxHeight: number;
+}
+
+/** Configurazione completa passata al generatore di dungeon */
+interface DungeonConfig {
+  seed?: number;
+  width: number;
+  height: number;
+  tileSize: number;
+  theme: DungeonThemeKey;
+  rooms: DungeonRoomConfig;
+  spawnEnemies: boolean;
+  spawnItems: boolean;
+  spawnExit: boolean;
+}
+
+/** Stanza generata — coordinate in tile */
+interface DungeonRoom {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  centerX: number;
+  centerY: number;
+}
+
+/** Risultato completo di una generazione dungeon */
+interface DungeonMap {
+  tiles: number[][];
+  rooms: DungeonRoom[];
+  playerSpawn: { x: number; y: number };
+  exit: { x: number; y: number } | null;
+  enemySpawns: { x: number; y: number }[];
+  itemSpawns: { x: number; y: number }[];
+  theme: DungeonThemeAsset;
+  config: DungeonConfig;
+  gridWidth: number;
+  gridHeight: number;
+}

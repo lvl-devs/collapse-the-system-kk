@@ -13,5 +13,5 @@
     "typeRoots": ["typings"]
   },
   "include": ["src", "typings"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "src/assets/tilemaps/collapse-ts-home.tsx"]
 }

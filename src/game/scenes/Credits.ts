@@ -7,7 +7,6 @@ export default class Credits extends Phaser.Scene {
   private static readonly MENU_MUSIC_KEY = "menu-theme";
   private static readonly RAIN_SFX_KEY = "rain-sfx";
 
-  private bg?: Phaser.GameObjects.Image;
   private overlay?: Phaser.GameObjects.Rectangle;
   private scanlines?: Phaser.GameObjects.TileSprite;
 
@@ -23,29 +22,29 @@ export default class Credits extends Phaser.Scene {
     super({ key: "Credits" });
   }
 
-  preload() {
-    this.load.image("bg_credits", "../assets/images/bg_credits.png");
-  }
-
   create() {
     this.sound.pauseOnBlur = false;
 
+    if (!this.scene.isActive("MenuBackdrop") && !this.scene.isSleeping("MenuBackdrop")) {
+      this.scene.launch("MenuBackdrop");
+    } else if (this.scene.isSleeping("MenuBackdrop")) {
+      this.scene.wake("MenuBackdrop");
+    }
+    this.scene.sendToBack("MenuBackdrop");
+
     MusicManager.start(this, Credits.MENU_MUSIC_KEY, {
       loop: true,
-      volume: GameData.musicVolume ?? 0.6,
+      volume: MusicManager.toEngineVolume(GameData.musicVolume ?? 0.6),
     });
 
     SfxManager.start(this, Credits.RAIN_SFX_KEY, {
       loop: true,
-      volume: GameData.sfxVolume ?? 0.35,
+      volume: GameData.sfxVolume ?? 0.7,
     });
 
     // ===== BACKGROUND =====
-    this.bg = this.add.image(0, 0, "bg_credits").setOrigin(0.5);
-    this.bg.setAlpha(0.95);
-
     // overlay scuro per contrasto
-    this.overlay = this.add.rectangle(0, 0, 10, 10, 0x000000, 0.25);
+    this.overlay = this.add.rectangle(0, 0, 10, 10, 0x000000, 0.32);
 
     // scanlines (texture generata)
     const texKey = "scanline_1px";
@@ -75,8 +74,9 @@ export default class Credits extends Phaser.Scene {
     this.title.setShadow(2, 2, "#000000", 0);
 
     // ===== CREDITS TEXT =====
-    const leftCredits = ["GAME DESIGN", "Your Name", "", "PROGRAMMING", "Your Name"];
-    const rightCredits = ["ART", "Your Name", "", "MUSIC & SOUND", "Your Name"];
+    const leftCredits = ["GAME DESIGN", "pH@ntom, conan","", "PROGRAMMING", "mokkek, pH@ntom,", "conan, ndreW, pako"];
+
+    const rightCredits = ["ART", "thatslory", "", "MUSIC & SOUND", "thatslory, pako"];
 
     this.leftText = this.add
       .text(0, 0, leftCredits, {
@@ -155,13 +155,6 @@ export default class Credits extends Phaser.Scene {
     const height = this.scale.height;
 
     const margin = Math.max(20, Math.round(Math.min(width, height) * 0.04));
-
-    // background cover
-    if (this.bg) {
-      this.bg.setPosition(width / 2, height / 2);
-      const scale = Math.max(width / this.bg.width, height / this.bg.height);
-      this.bg.setScale(scale);
-    }
 
     // overlay / scanlines full screen
     this.overlay?.setPosition(width / 2, height / 2).setSize(width, height);

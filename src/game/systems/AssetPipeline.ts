@@ -5,23 +5,34 @@ type Phase = "critical" | "deferred";
 
 const CRITICAL_IMAGE_KEYS = new Set(["bg_logo", "title_img"]);
 const CRITICAL_VIDEO_KEYS = new Set(["bg-menu"]);
-const CRITICAL_SOUND_KEYS = new Set(["menu-theme", "rain-sfx"]);
+const CRITICAL_SOUND_KEYS = new Set(["menu-theme", "level-1-theme", "rain-sfx"]);
 
 export default class AssetPipeline {
-  private static deferredStarted = false;
+  private static deferredReady = false;
+  private static deferredLoading = false;
 
   static preloadCritical(scene: Phaser.Scene): void {
     this.loadAssets(scene, "critical");
   }
 
   static startDeferredPreload(scene: Phaser.Scene): void {
-    if (this.deferredStarted) {
-      return;
-    }
+    if (this.deferredReady || this.deferredLoading) return;
 
-    this.deferredStarted = true;
+    this.deferredLoading = true;
     this.loadAssets(scene, "deferred");
+    scene.load.once(Phaser.Loader.Events.COMPLETE, () => {
+      this.deferredReady = true;
+      this.deferredLoading = false;
+    });
     scene.load.start();
+  }
+
+  static isDeferredReady(): boolean {
+    return this.deferredReady;
+  }
+
+  static isDeferredLoading(): boolean {
+    return this.deferredLoading;
   }
 
   private static loadAssets(scene: Phaser.Scene, phase: Phase): void {
@@ -29,9 +40,7 @@ export default class AssetPipeline {
     if (GameData.images != null) {
       GameData.images.forEach((element: ImageAsset) => {
         const isCritical = CRITICAL_IMAGE_KEYS.has(element.name);
-        if (!this.shouldQueue(phase, isCritical) || scene.textures.exists(element.name)) {
-          return;
-        }
+        if (!this.shouldQueue(phase, isCritical) || scene.textures.exists(element.name)) return;
         scene.load.image(element.name, element.path);
       });
     }
@@ -71,9 +80,7 @@ export default class AssetPipeline {
     if (GameData.videos != null) {
       GameData.videos.forEach((element: VideoAsset) => {
         const isCritical = CRITICAL_VIDEO_KEYS.has(element.name);
-        if (!this.shouldQueue(phase, isCritical) || scene.cache.video.exists(element.name)) {
-          return;
-        }
+        if (!this.shouldQueue(phase, isCritical) || scene.cache.video.exists(element.name)) return;
         scene.load.video(element.name, element.path, true);
       });
     }
@@ -82,9 +89,7 @@ export default class AssetPipeline {
     if (GameData.sounds != null) {
       GameData.sounds.forEach((element: SoundAsset) => {
         const isCritical = CRITICAL_SOUND_KEYS.has(element.name);
-        if (!this.shouldQueue(phase, isCritical) || scene.cache.audio.exists(element.name)) {
-          return;
-        }
+        if (!this.shouldQueue(phase, isCritical) || scene.cache.audio.exists(element.name)) return;
         scene.load.audio(element.name, element.paths);
       });
     }

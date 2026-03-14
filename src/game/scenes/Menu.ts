@@ -3,6 +3,7 @@ import GameData from "../../GameData";
 import AssetPipeline from "../systems/AssetPipeline";
 import MusicManager from "../audio/MusicManager";
 import SfxManager from "../audio/SfxManager";
+import LevelStorage from "../systems/LevelStorage";
 import SettingsStorage from "../systems/SettingsStorage";
 
 export default class Menu extends Phaser.Scene {
@@ -13,6 +14,12 @@ export default class Menu extends Phaser.Scene {
   private _menuItems: Phaser.GameObjects.Text[] = [];
 
   constructor(){ super({ key: "Menu" }); }
+
+  private playSelectSfx(): void {
+    if (localStorage.getItem("soundEffectsEnabled") === "true") {
+      this.sound.play("menuSelect");
+    }
+  }
 
   create(){
     SettingsStorage.loadVolumeSettings();
@@ -30,17 +37,14 @@ export default class Menu extends Phaser.Scene {
       loop: true,
       volume: GameData.sfxVolume ?? 0.7
     });
-    const { width, height } = this.scale;
-    const bgVideo = this.add.video(width / 2, height / 2, "bg-menu");
+    if (!this.scene.isActive("MenuBackdrop") && !this.scene.isSleeping("MenuBackdrop")) {
+      this.scene.launch("MenuBackdrop");
+    } else if (this.scene.isSleeping("MenuBackdrop")) {
+      this.scene.wake("MenuBackdrop");
+    }
+    this.scene.sendToBack("MenuBackdrop");
 
-    bgVideo.setOrigin(0.5);
-    bgVideo.play(true);
-    bgVideo.on("created", () => {
-      const scaleX = width / bgVideo.width;
-      const scaleY = height / bgVideo.height;
-      const scale = Math.max(scaleX, scaleY);
-      bgVideo.setScale(scale);
-    });
+    const { width, height } = this.scale;
 
     this.add
       .text(width * 0.05, height * 0.05, GameData.globals.gameTitle, {
@@ -72,8 +76,7 @@ export default class Menu extends Phaser.Scene {
         })
 
         .on("pointerdown", () => {
-          if(localStorage.getItem("soundEffectsEnabled") === "true")
-            this.sound.play("menuSelect");
+          this.playSelectSfx();
           this.selectItem(index);
         });
       this._menuItems.push(menuItem);
@@ -132,8 +135,37 @@ export default class Menu extends Phaser.Scene {
     const item = GameData.menu.items[index];
     console.log("[Menu] selectItem - starting scene:", item.scene);
     if (item.scene === "GamePlay") {
+      LevelStorage.resetToFirstLevel();
       MusicManager.stop(this, Menu.MENU_MUSIC_KEY);
       SfxManager.stop(this, Menu.RAIN_SFX_KEY);
+      this.scene.stop("MenuBackdrop");
+
+      const startGameplay = () => {
+        this.scene.start(item.scene);
+      };
+
+      if (AssetPipeline.isDeferredReady()) {
+        startGameplay();
+        return;
+      }
+
+      const loadingLabel = this.add
+        .text(this.scale.width * 0.05, this.scale.height * 0.82, "LOADING MISSION DATA...", {
+          color: "#70fdc2",
+        })
+        .setFontSize(24)
+        .setFontFamily(GameData.preloader.loadingTextFont)
+        .setShadow(2, 2, "#001E17", 0, false, true);
+
+      if (!AssetPipeline.isDeferredLoading()) {
+        AssetPipeline.startDeferredPreload(this);
+      }
+
+      this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+        loadingLabel.destroy();
+        startGameplay();
+      });
+      return;
     }
     this.scene.start(item.scene);
   }

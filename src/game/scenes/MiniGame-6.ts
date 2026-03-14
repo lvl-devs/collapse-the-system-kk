@@ -2,6 +2,24 @@ import Phaser from 'phaser';
 
 export default class MiniGame6 extends Phaser.Scene {
 
+    private static readonly NUMERIC_BUTTON_KEYS = [
+        'button_0',
+        'button_1',
+        'button_2',
+        'button_3',
+        'button_4',
+        'button_5',
+        'button_6',
+        'button_7',
+        'button_8',
+        'button_9',
+    ] as const;
+
+    private static readonly ACTION_BUTTON_KEYS = [
+        'button_c',
+        'button_ok',
+    ] as const;
+
     private code: string = '';
     private secretCode: string = '';
 
@@ -26,10 +44,34 @@ export default class MiniGame6 extends Phaser.Scene {
 
     preload() {
 
-        this.load.image('background_wall', '../assets/images/bg-hacker.png');
-        this.load.image('keypad_bg', '../assets/images/KEYPAD.png');
+        this.loadImageIfMissing('background_wall', 'images/bg-hacker.png');
+        this.loadImageIfMissing('keypad_bg', 'images/KEYPAD.png');
 
-        this.load.audio('key_beep', '../assets/sounds/keypad_beep.mp3');
+        MiniGame6.NUMERIC_BUTTON_KEYS.forEach((key) => {
+            const digit = key.replace('button_', '');
+            this.loadImageIfMissing(key, `images/${digit}.png`);
+            this.loadImageIfMissing(`${key}_pressed`, `images/${digit}_pressed.png`);
+        });
+
+        MiniGame6.ACTION_BUTTON_KEYS.forEach((key) => {
+            const action = key.replace('button_', '');
+            this.loadImageIfMissing(key, `images/${action}.png`);
+            this.loadImageIfMissing(`${key}_pressed`, `images/${action}_pressed.png`);
+        });
+
+        this.loadAudioIfMissing('key_beep', 'sounds/keypad_beep.mp3');
+    }
+
+    private loadImageIfMissing(key: string, path: string): void {
+        if (!this.textures.exists(key)) {
+            this.load.image(key, path);
+        }
+    }
+
+    private loadAudioIfMissing(key: string, path: string): void {
+        if (!this.cache.audio.exists(key)) {
+            this.load.audio(key, path);
+        }
     }
 
     create() {

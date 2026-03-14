@@ -20,6 +20,38 @@ export default class Minigame7 extends Phaser.Scene {
   private screenW = 0;
   private screenH = 0;
 
+  // Layout tuning
+  private readonly SCREEN_X_RATIO = 0.503;
+  private readonly SCREEN_Y_RATIO = 0.392;
+  private readonly SCREEN_W_RATIO = 0.50;
+  private readonly SCREEN_H_RATIO = 0.50;
+
+  private readonly LEFT_COL_X_RATIO = 0.37;
+  private readonly RIGHT_COL_X_RATIO = 0.20;
+  private readonly TOP_Y_RATIO = 0.50;
+
+  private readonly CLOSE_OFFSET_X = 18;
+  private readonly CLOSE_OFFSET_Y = 16;
+
+  private readonly TITLE_Y = 97;
+  private readonly CLUE_Y = 145;
+  private readonly SECTION_HEADER_Y = 96;
+  private readonly ROW_START_Y = 130;
+  private readonly ROW_GAP_Y = 20;
+  private readonly DETAIL_TITLE_Y = 129;
+  private readonly DETAIL_INFO_Y = 145;
+  private readonly DESTINATION_Y = 232;
+  private readonly FOOTER_X_OFFSET = 280;
+  private readonly FOOTER_Y_RATIO = 0.50;
+  private readonly STATUS_Y_RATIO = 0.33;
+
+  private readonly INTRO_PAN_OFFSET_X = -10;
+  private readonly INTRO_PAN_OFFSET_Y = 40;
+  private readonly INTRO_ZOOM = 1.6;
+
+  private readonly COMPLETE_TITLE_Y = -10;
+  private readonly COMPLETE_SUB_Y = 40;
+
   private flights: FlightData[] = [
     { code: "AZ417", origin: "MILAN", destination: "PARIS",  time: "19:20", gate: "A2" },
     { code: "IB228", origin: "MADRID", destination: "BERLIN", time: "19:35", gate: "B1" },
@@ -92,10 +124,10 @@ this.playIntroZoom();
   );
 
   // area utile dello schermo nero
-  this.screenX = width * 0.503;
-  this.screenY = height * 0.392;
-  this.screenW = width * 0.50;
-  this.screenH = height * 0.50;
+  this.screenX = width * this.SCREEN_X_RATIO;
+  this.screenY = height * this.SCREEN_Y_RATIO;
+  this.screenW = width * this.SCREEN_W_RATIO;
+  this.screenH = height * this.SCREEN_H_RATIO;
 }
 
 private playIntroZoom() {
@@ -110,8 +142,8 @@ private playIntroZoom() {
 
     // movimento lento verso il monitor
     cam.pan(
-      this.screenX - 10,
-      this.screenY + 40,
+      this.screenX + this.INTRO_PAN_OFFSET_X,
+      this.screenY + this.INTRO_PAN_OFFSET_Y,
       1800,
       "Sine.easeOut"
     );
@@ -119,7 +151,7 @@ private playIntroZoom() {
     // zoom contemporaneo
     this.tweens.add({
       targets: cam,
-      zoom: 1.6,
+      zoom: this.INTRO_ZOOM,
       duration: 1900,
       ease: "Sine.Out"
     });
@@ -134,9 +166,9 @@ private playIntroZoom() {
     this.bg.setDisplaySize(width, height);
   }
 
-  private createCloseButton() {
-  const closeX = this.screenX + this.screenW / 2 - 18 * this.uiScale;
-  const closeY = this.screenY - this.screenH / 2 + 16 * this.uiScale;
+private createCloseButton() {
+  const closeX = this.screenX + this.screenW / 2 - this.CLOSE_OFFSET_X * this.uiScale;
+  const closeY = this.screenY - this.screenH / 2 + this.CLOSE_OFFSET_Y * this.uiScale;
 
   const closeText = this.add
     .text(closeX, closeY, "X", {
@@ -168,14 +200,14 @@ private playIntroZoom() {
 }
 
   private createInterface() {
-  const leftX = this.screenX - this.screenW * 0.37;
-  const rightX = this.screenX + this.screenW * 0.20;
-  const topY = this.screenY - this.screenH * 0.50;
+  const leftX = this.screenX - this.screenW * this.LEFT_COL_X_RATIO;
+  const rightX = this.screenX + this.screenW * this.RIGHT_COL_X_RATIO;
+  const topY = this.screenY - this.screenH * this.TOP_Y_RATIO;
 
   this.titleText = this.add
-    .text(this.screenX, topY + 97, "FLIGHT CONTROL", {
+    .text(this.screenX, topY + this.TITLE_Y * this.uiScale, "FLIGHT CONTROL", {
       fontFamily: "Pixelify Sans",
-      fontSize: `${Math.max(18, Math.round(28 * this.uiScale))}px`,
+      fontSize: `${Math.max(18, Math.round(22 * this.uiScale))}px`,
       color: "#46ff88",
       fontStyle: "bold",
       resolution: 2,
@@ -183,7 +215,7 @@ private playIntroZoom() {
     .setOrigin(0.5);
 
   this.clueText = this.add
-    .text(this.screenX, topY + 108 * this.uiScale, "", {
+    .text(this.screenX, topY + this.CLUE_Y * this.uiScale, "", {
       fontFamily: "Pixelify Sans",
       fontSize: `${Math.max(8, Math.round(11 * this.uiScale))}px`,
       color: "#8de8ff",
@@ -194,7 +226,7 @@ private playIntroZoom() {
     .setOrigin(0.5);
 
   this.add
-    .text(leftX, topY + 96 * this.uiScale, "FLIGHTS", {
+    .text(leftX, topY + this.SECTION_HEADER_Y * this.uiScale, "FLIGHTS", {
       fontFamily: "Pixelify Sans",
       fontSize: `${Math.max(10, Math.round(20 * this.uiScale))}px`,
       color: "#d7fff0",
@@ -203,7 +235,7 @@ private playIntroZoom() {
     .setOrigin(0, 0.5);
 
   this.add
-    .text(rightX, topY + 96 * this.uiScale, "DETAILS", {
+    .text(rightX, topY + this.SECTION_HEADER_Y * this.uiScale, "DETAILS", {
       fontFamily: "Pixelify Sans",
       fontSize: `${Math.max(10, Math.round(20 * this.uiScale))}px`,
       color: "#d7fff0",
@@ -214,19 +246,24 @@ private playIntroZoom() {
   this.rowTexts = [];
   for (let i = 0; i < this.flights.length; i++) {
     const row = this.add
-      .text(leftX, topY + 130 * this.uiScale + i * 20 * this.uiScale, "", {
-        fontFamily: "Pixelify Sans",
-        fontSize: `${Math.max(8, Math.round(12 * this.uiScale))}px`,
-        color: "#9bd7c5",
-        resolution: 2,
-      })
+      .text(
+        leftX,
+        topY + this.ROW_START_Y * this.uiScale + i * this.ROW_GAP_Y * this.uiScale,
+        "",
+        {
+          fontFamily: "Pixelify Sans",
+          fontSize: `${Math.max(8, Math.round(12 * this.uiScale))}px`,
+          color: "#9bd7c5",
+          resolution: 2,
+        }
+      )
       .setOrigin(0, 0.5);
 
     this.rowTexts.push(row);
   }
 
   this.detailTitleText = this.add
-    .text(rightX, topY + 129* this.uiScale, "", {
+    .text(rightX, topY + this.DETAIL_TITLE_Y * this.uiScale, "", {
       fontFamily: "Pixelify Sans",
       fontSize: `${Math.max(12, Math.round(16 * this.uiScale))}px`,
       color: "#46ff88",
@@ -237,7 +274,7 @@ private playIntroZoom() {
     .setOrigin(0, 0.5);
 
   this.detailInfoText = this.add
-    .text(rightX, topY + 145 * this.uiScale, "", {
+    .text(rightX, topY + this.DETAIL_INFO_Y * this.uiScale, "", {
       fontFamily: "Pixelify Sans",
       fontSize: `${Math.max(8, Math.round(10 * this.uiScale))}px`,
       color: "#d7fff0",
@@ -247,7 +284,7 @@ private playIntroZoom() {
     .setOrigin(0, 0);
 
   this.destinationText = this.add
-    .text(rightX, topY + 232 * this.uiScale, "", {
+    .text(rightX, topY + this.DESTINATION_Y * this.uiScale, "", {
       fontFamily: "Pixelify Sans",
       fontSize: `${Math.max(9, Math.round(11 * this.uiScale))}px`,
       color: "#ffe27a",
@@ -257,7 +294,7 @@ private playIntroZoom() {
     .setOrigin(0, 0.5);
 
   this.footerText = this.add
-    .text(this.screenX - 280, this.screenY + this.screenH * 0.50, "", {
+    .text(this.screenX - this.FOOTER_X_OFFSET, this.screenY + this.screenH * this.FOOTER_Y_RATIO, "", {
       fontFamily: "Pixelify Sans",
       fontSize: `${Math.max(8, Math.round(9 * this.uiScale))}px`,
       color: "#9db7c7",
@@ -267,7 +304,7 @@ private playIntroZoom() {
     .setOrigin(0, 0.5);
 
   this.statusText = this.add
-    .text(this.screenX, this.screenY + this.screenH * 0.33, "", {
+    .text(this.screenX, this.screenY + this.screenH * this.STATUS_Y_RATIO, "", {
       fontFamily: "Pixelify Sans",
       fontSize: `${Math.max(10, Math.round(12 * this.uiScale))}px`,
       color: "#ffffff",
@@ -560,7 +597,7 @@ if (isSelected) {
     this.hideUI();
 
     const finalText = this.add
-      .text(this.screenX, this.screenY - 10 * this.uiScale, "FLIGHT DIVERTED", {
+      .text(this.screenX, this.screenY + this.COMPLETE_TITLE_Y * this.uiScale, "FLIGHT DIVERTED", {
         fontFamily: "Pixelify Sans",
         fontSize: `${Math.max(24, Math.round(34 * this.uiScale))}px`,
         color: "#46ff88",
@@ -569,7 +606,7 @@ if (isSelected) {
       .setOrigin(0.5);
 
     const finalSub = this.add
-  .text(this.screenX, this.screenY + 40 * this.uiScale, `ALL TARGET FLIGHTS DIVERTED`, {
+  .text(this.screenX, this.screenY + this.COMPLETE_SUB_Y * this.uiScale, `ALL TARGET FLIGHTS DIVERTED`, {
     fontFamily: "Pixelify Sans",
     fontSize: `${Math.max(14, Math.round(18 * this.uiScale))}px`,
     color: "#8de8ff",

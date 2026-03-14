@@ -120,6 +120,10 @@ export const GameData: GameDataType = {
     { name: "left-side-doors-open", path: "/tilemaps/doors/side/left-side-doors-open.png" },
     { name: "right-side-doors-closed", path: "/tilemaps/doors/side/right-side-doors-closed.png" },
     { name: "right-side-doors-open", path: "/tilemaps/doors/side/right-side-doors-open.png" },
+    { name: "left-side-door-closed", path: "/tilemaps/doors/side/left-side-doors-closed.png" },
+    { name: "left-side-door-open", path: "/tilemaps/doors/side/left-side-doors-open.png" },
+    { name: "right-side-door-closed", path: "/tilemaps/doors/side/right-side-doors-closed.png" },
+    { name: "right-side-door-open", path: "/tilemaps/doors/side/right-side-doors-open.png" },
   ],
 
   tilemaps: [

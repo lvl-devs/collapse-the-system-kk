@@ -29,6 +29,30 @@ export default class GamePlay extends Phaser.Scene {
   private isAudioPausedForMenu = false;
   private isStepSfxPlaying = false;
 
+  private resolveTextureKeyFromImage(imageName: string, fallbackKey: string): string {
+    const fileName = imageName.split(/[/\\]/).pop() ?? "";
+    const baseName = fileName.replace(/\.[^/.]+$/, "");
+    const normalized = baseName.replace(/_/g, "-").toLowerCase();
+
+    const aliasMap: Record<string, string> = {
+      "left-side-door-closed": "left-side-doors-closed",
+      "left-side-door-open": "left-side-doors-open",
+      "right-side-door-closed": "right-side-doors-closed",
+      "right-side-door-open": "right-side-doors-open",
+    };
+
+    const candidate = aliasMap[normalized] ?? normalized;
+    if (this.textures.exists(candidate)) {
+      return candidate;
+    }
+
+    if (this.textures.exists(baseName)) {
+      return baseName;
+    }
+
+    return fallbackKey;
+  }
+
   private getOrCreateTilesetFrame(
     textureKey: string,
     tileset: Phaser.Tilemaps.Tileset,
@@ -171,9 +195,7 @@ export default class GamePlay extends Phaser.Scene {
                 }
 
                 if (imageName) {
-                    // Estraiamo il nome del file senza estensione e cartella come fallback per la chiave
-                    const parts = imageName.split(/[/\\]/);
-                    textureKey = parts[parts.length - 1].split('.')[0];
+                  textureKey = this.resolveTextureKeyFromImage(imageName, textureKey);
                     // console.log(`[Mapping Debug] imageName: ${imageName} -> textureKey: ${textureKey}`);
                 } else {
                     frame = this.getOrCreateTilesetFrame(textureKey, tileset, localId);

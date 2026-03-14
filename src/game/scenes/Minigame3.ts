@@ -1,4 +1,6 @@
 import Phaser from "phaser";
+import { GameData } from "../../GameData";
+import SfxManager from "../audio/SfxManager";
 
 type BitCell = {
   row: number;
@@ -70,6 +72,12 @@ export default class Minigame3 extends Phaser.Scene {
   preload() {
     this.load.image("min3_bgLaptop", "../assets/images/min3/bg-laptop.png");
     this.load.image("min3_accessGranted", "../assets/images/min3/Access_granted.png");
+    if (!this.cache.audio.exists("loading-complete")) {
+      this.load.audio("loading-complete", "../assets/sounds/loading-complete.mp3");
+    }
+    if (!this.cache.audio.exists("error-1")) {
+      this.load.audio("error-1", "../assets/sounds/minigame-3/error-1.mp3");
+    }
   }
 
   create() {
@@ -381,6 +389,9 @@ export default class Minigame3 extends Phaser.Scene {
     } else {
       this.showStatus("ERROR: WRONG BIT", "#ff4d6d");
       this.errorCell(cell);
+      SfxManager.start(this, "error-1", {
+        volume: GameData.sfxVolume ?? 0.7,
+      });
     }
 
     if (this.isTaskCompleted()) {
@@ -558,6 +569,9 @@ export default class Minigame3 extends Phaser.Scene {
     this.progress = 100;
     this.updateProgressUI();
     this.registry.set("task3Completed", true);
+    SfxManager.start(this, "loading-complete", {
+      volume: GameData.sfxVolume ?? 0.7,
+    });
 
     this.hideMonitorUI();
 

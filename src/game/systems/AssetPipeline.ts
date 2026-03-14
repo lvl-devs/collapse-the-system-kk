@@ -3,7 +3,7 @@ import { GameData } from "../../GameData";
 
 type Phase = "critical" | "deferred";
 
-const CRITICAL_IMAGE_KEYS = new Set(["bg_logo", "title_img"]);
+const CRITICAL_IMAGE_KEYS = new Set(["bg_logo"]);
 const CRITICAL_VIDEO_KEYS = new Set(["bg-menu"]);
 const CRITICAL_SOUND_KEYS = new Set(["menu-theme", "level-1-theme", "rain-sfx"]);
 

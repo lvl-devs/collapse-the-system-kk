@@ -98,7 +98,6 @@ export const GameData: GameDataType = {
 
   images: [
     { name: "bg_logo", path: "/images/bg_logo.png" },
-    { name: "title_img", path: "/images/title.png" },
     { name: "tastierino", path: "/images/Tastierino.png" },
     { name: "button_1", path: "/images/1.png" },
     { name: "button_1_pressed", path: "/images/1_pressed.png" },

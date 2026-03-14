@@ -75,6 +75,12 @@ export default class Minigame5 extends Phaser.Scene {
   private successTitleText?: Phaser.GameObjects.Text;
   private successReasonText?: Phaser.GameObjects.Text;
 
+  private exitMinigame(): void {
+  this.stopMovementSfx();
+  this.scene.stop();
+  this.scene.resume("GamePlay");
+}
+
   constructor() {
     super("Minigame5");
   }
@@ -118,10 +124,16 @@ export default class Minigame5 extends Phaser.Scene {
     }
   }
 
+
+  
   create(): void {
     this.resetRoundState();
 
     const { width, height } = this.scale;
+
+    this.input.keyboard?.on("keydown-ESC", () => {
+  this.exitMinigame();
+});
 
     // ─── Exit X ─────────────────────────────────────
 const exitX = this.add

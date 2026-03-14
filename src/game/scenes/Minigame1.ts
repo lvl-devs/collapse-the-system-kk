@@ -79,6 +79,7 @@ export default class Minigame1 extends Phaser.Scene {
   private readonly externalBoxKey = "minigame1-external-box";
   private readonly accessGrantedKey = "minigame1-access-granted";
   private readonly bgKey = "minigame1-bg";
+  
 
   preload() {
   this.load.image(
@@ -117,10 +118,18 @@ export default class Minigame1 extends Phaser.Scene {
     super("Minigame1");
   }
 
+  private exitMinigame() {
+  this.scene.stop();
+  this.scene.resume("GamePlay");
+}
   // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
   create() {
 const { width, height } = this.scale;
+
+this.input.keyboard?.on("keydown-ESC", () => {
+  this.exitMinigame();
+});
 
   this.scale.off("resize");
   this.scale.on("resize", () => this.scene.restart());

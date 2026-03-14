@@ -84,9 +84,17 @@ export default class Minigame4 extends Phaser.Scene {
     }
   }
 
+  private exitMinigame() {
+  this.scene.stop();
+  this.scene.resume("GamePlay");
+}
+
   create() {
     const { width, height } = this.scale;
 
+    this.input.keyboard?.on("keydown-ESC", () => {
+  this.exitMinigame();
+});
     this.scale.off("resize");
     this.scale.on("resize", () => {
       this.scene.restart();

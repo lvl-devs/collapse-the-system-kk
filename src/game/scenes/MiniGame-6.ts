@@ -74,6 +74,8 @@ export default class MiniGame6 extends Phaser.Scene {
         }
     }
 
+    
+
     create() {
 
         const centerX = this.cameras.main.width / 2;

@@ -84,7 +84,8 @@ export default class GamePlay extends Phaser.Scene {
     // Mappatura tileset standard (opzionale, MapProcessor prova a indovinare)
     // Mappatura tileset standard
     const TS_MAP: Record<string, string> = {
-        "home": "tileset-cyber",
+      "home": "tileset-cyber",
+      "airport": "airport",
     };
 
     const mapData = MapProcessor.processMap(this, "static-map", TS_MAP);

@@ -60,7 +60,7 @@ export const GameData: GameDataType = {
     gameWidth: 1280,
     gameHeight: 800,
     gameTitle: "Collapse The System",
-    bgColor: "#0a0a0f",
+    bgColor: "#111518",
     debug: false,
     defaultFont: {
       key: "Pixelify Sans",
@@ -98,10 +98,18 @@ export const GameData: GameDataType = {
 
   images: [
     { name: "bg_logo", path: "/images/bg_logo.png" },
+    { name: "airport", path: "/tilemaps/airport.png" },
+    { name: "home", path: "/tilemaps/home.png" },
     { name: "tileset-cyber", path: "/tilemaps/home.png" },
     { name: "tileset-cave", path: "/tilemaps/home.png" },
     { name: "tileset-facility", path: "/tilemaps/home.png" },
     { name: "tileset-void", path: "/tilemaps/home.png" },
+    { name: "airport-desk", path: "/tilemaps/other-objects/airport-desk.png" },
+    { name: "airport-fire-extinguisher", path: "/tilemaps/other-objects/airport-fire-extinguisher.png" },
+    { name: "baggage-1", path: "/tilemaps/other-objects/baggage-1.png" },
+    { name: "baggage-2", path: "/tilemaps/other-objects/baggage-2.png" },
+    { name: "baggage-3", path: "/tilemaps/other-objects/baggage-3.png" },
+    { name: "baggage-conveyor", path: "/tilemaps/other-objects/baggage-conveyor.png" },
     { name: "server-rack-closed", path: "/tilemaps/other-objects/server-rack-closed.png" },
     { name: "server-rack-open", path: "/tilemaps/other-objects/server-rack-open.png" },
     { name: "fire-extinguisher", path: "/tilemaps/other-objects/fire-extinguisher.png" },
